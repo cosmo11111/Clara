@@ -37,18 +37,30 @@ if uploaded_file is not None:
 
         if st.button("Categorize with AI"):
             with st.spinner("AI is thinking..."):
-                st.write(f"API Key found: {st.secrets['GEMINI_API_KEY'][:5]}***")
-                response = model.generate_content(
-                    prompt, 
-                    generation_config={"response_mime_type": "application/json"}
-                )
+                # 1. Clean the text first
+                clean_text = raw_text.replace('\xa0', ' ').strip()
+                
+                # 2. Use a more explicit config
+                generation_config = {
+                    "temperature": 0.1,  # Low temperature is better for data extraction
+                    "response_mime_type": "application/json",
+                }
                 
                 try:
-                    data = json.loads(response.text)
-                    st.table(data) # Show the result as a clean table
+                    # Use a simpler prompt for the prototype test
+                    simple_prompt = f"Convert this bank statement text into a JSON list of transactions. Text: {clean_text}"
+                    
+                    response = model.generate_content(
+                        simple_prompt,
+                        generation_config=generation_config
+                    )
+                    
+                    # 3. Print the raw response to the screen so you can see it if it fails
+                    st.write("AI Response Received!")
+                    st.json(response.text)
+                    
                 except Exception as e:
-                    st.error("Failed to parse AI response. Try again.")
-                    st.write(response.text)
-                    st.exception(e)
+                    st.error("Something went wrong with the AI call.")
+                    st.write(str(e)) # This will show the EXACT reason (e.g., 400 Invalid Argument)
     else:
         st.error("Could not read text from this PDF. Is it a scanned image?")
