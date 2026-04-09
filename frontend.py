@@ -21,6 +21,14 @@ if uploaded_file:
 
 # ====================== MAIN UI ======================
 if st.session_state.pdf_bytes:
+    doc = fitz.open(stream=st.session_state.pdf_bytes, filetype="pdf")
+    first_page_text = doc[0].get_text()
+    
+    if not first_page_text.strip():
+        st.error("🚨 This PDF is a scanned image. There is no selectable text layer for the highlighter to grab.")
+    else:
+        st.write("✅ Text detected in PDF. Highlighting should be possible.")
+        
     col1, col2 = st.columns([2, 1])
 
     with col1:
