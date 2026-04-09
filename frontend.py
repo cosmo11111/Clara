@@ -34,14 +34,23 @@ if st.session_state.working_doc:
 
     with col1:
         st.subheader("Navigation")
-        page_num = st.slider("Page", 0, num_pages - 1, st.session_state.current_page, key="page_slider")
-        st.session_state.current_page = page_num
+        
+        # Use the key "current_page" directly in the slider. 
+        # This automatically syncs st.session_state.current_page with the slider.
+        page_num = st.slider(
+            "Page", 
+            0, 
+            num_pages - 1, 
+            key="current_page"
+        )
 
-        st.caption(f"Showing page {page_num + 1} of {num_pages}")
+    st.caption(f"Showing page {page_num + 1} of {num_pages}")
 
-        if st.button("🔄 Reset all redactions (start over)"):
-            st.session_state.working_doc = fitz.open(stream=st.session_state.original_bytes, filetype="pdf")
-            st.rerun()
+    if st.button("🔄 Reset all redactions (start over)"):
+        st.session_state.working_doc = fitz.open(stream=st.session_state.original_bytes, filetype="pdf")
+        # When resetting, we also reset the session state page number
+        st.session_state.current_page = 0
+        st.rerun()
 
     with col2:
         # Render current page as high-res image
