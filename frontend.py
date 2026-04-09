@@ -20,6 +20,24 @@ if uploaded_file:
     st.session_state.pdf_bytes = uploaded_file.read()
 
 # ====================== MAIN UI ======================
+from streamlit_annotation_tools import pdf_labeler
+
+if "my_boxes" not in st.session_state:
+    st.session_state.my_boxes = []
+
+# This call handles the "Sticking"
+new_labels = pdf_labeler(
+    "statement.pdf",
+    labels=["REDACT"],
+    annotations=st.session_state.my_boxes
+)
+
+# If the user added a new highlight, update the state
+if new_labels is not None and new_labels != st.session_state.my_boxes:
+    st.session_state.my_boxes = new_labels
+    st.rerun()
+
+
 if st.session_state.pdf_bytes:
     doc = fitz.open(stream=st.session_state.pdf_bytes, filetype="pdf")
     first_page_text = doc[0].get_text()
