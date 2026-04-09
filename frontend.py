@@ -37,6 +37,7 @@ if uploaded_file is not None:
 
         if st.button("Categorize with AI"):
             with st.spinner("AI is thinking..."):
+                st.write(f"API Key found: {st.secrets['GEMINI_API_KEY'][:5]}***")
                 response = model.generate_content(
                     prompt, 
                     generation_config={"response_mime_type": "application/json"}
@@ -48,5 +49,6 @@ if uploaded_file is not None:
                 except Exception as e:
                     st.error("Failed to parse AI response. Try again.")
                     st.write(response.text)
+                    st.exception(e)
     else:
         st.error("Could not read text from this PDF. Is it a scanned image?")
