@@ -42,7 +42,7 @@ if st.session_state.working_doc:
             "Page", 
             min_value=0, 
             max_value=num_pages - 1, 
-            key="current_page" 
+            key="test_page" 
         )
     with col2:
         # Render current page as high-res image
