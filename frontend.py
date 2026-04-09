@@ -34,16 +34,41 @@ if st.session_state.working_doc:
     with col1:
         st.subheader("Navigation")
         
-        # Use a safe default for the key if it doesn't exist yet
+        # Initialize page if not present
         if "current_page" not in st.session_state:
             st.session_state.current_page = 0
-            
-        page_num = st.slider(
-            "Page", 
-            min_value=0, 
-            max_value=num_pages - 1, 
-            key="test_page" 
-        )
+    
+        # Ensure current_page is always valid (safety check)
+        st.session_state.current_page = max(0, min(st.session_state.current_page, num_pages - 1))
+    
+        # Button-based Navigation
+        nav_col1, nav_col2 = st.columns(2)
+        
+        with nav_col1:
+            if st.button("⬅️ Prev") and st.session_state.current_page > 0:
+                st.session_state.current_page -= 1
+                st.rerun()
+        with nav_col2:
+            if st.button("Next ➡️") and st.session_state.current_page < num_pages - 1:
+                st.session_state.current_page += 1
+                st.rerun()
+    
+        st.write(f"**Page {st.session_state.current_page + 1} of {num_pages}**")
+        
+        # Simple page jump (Optional)
+        jump_page = st.number_input("Jump to page", 1, num_pages, st.session_state.current_page + 1)
+        if jump_page - 1 != st.session_state.current_page:
+            st.session_state.current_page = jump_page - 1
+            st.rerun()
+    
+        if st.button("🔄 Reset Redactions"):
+            st.session_state.working_doc = fitz.open(stream=st.session_state.original_bytes, filetype="pdf")
+            st.session_state.current_page = 0
+            st.rerun()
+
+    # Use this for the rest of your code
+    page_num = st.session_state.current_page
+
     with col2:
         # Render current page as high-res image
         page = doc[page_num]
