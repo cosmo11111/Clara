@@ -1,3 +1,6 @@
+
+Copy
+
 import streamlit as st
 import fitz
 import pdfplumber
@@ -7,22 +10,22 @@ import json
 import plotly.graph_objects as go
 import google.generativeai as genai
 import pandas as pd
-
+ 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Expense Categorizer", page_icon="💳", layout="wide")
-
+ 
 st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
-
+ 
   html, body, .stApp { font-family: 'DM Sans', sans-serif; background-color: #0f0f13; color: #e8e6e1; }
-
+ 
   /* Sidebar */
   section[data-testid="stSidebar"] { background: #17171d !important; border-right: 1px solid #2a2a35; }
   section[data-testid="stSidebar"] * { color: #c9c7c0 !important; }
   section[data-testid="stSidebar"] .stSelectbox label,
   section[data-testid="stSidebar"] .stSlider label { color: #888 !important; }
-
+ 
   /* Step badges */
   .step-badge {
     display:inline-flex; align-items:center; gap:10px;
@@ -39,7 +42,7 @@ st.markdown("""
   .step-num.active { background:#f0c040; box-shadow: 0 0 12px rgba(240,192,64,0.4); }
   .step-text { font-size:14px; color:#c9c7c0; line-height:1.4; }
   .step-text b { color:#e8e6e1; }
-
+ 
   /* Info boxes */
   .info-box {
     background:#1a1a24; border-left:3px solid #f0c040;
@@ -49,7 +52,7 @@ st.markdown("""
   .info-box.green { border-left-color:#34d399; background:#0f1f1a; }
   .info-box.blue  { border-left-color:#60a5fa; background:#0f1624; }
   .info-box.red   { border-left-color:#f87171; background:#1f0f0f; }
-
+ 
   /* Cards */
   .card {
     background:#1e1e28; border:1px solid #2a2a38;
@@ -57,7 +60,7 @@ st.markdown("""
   }
   .card h3 { margin:0 0 4px; font-size:1rem; color:#e8e6e1; }
   .card p  { margin:0; font-size:.82rem; color:#888; }
-
+ 
   /* Metric strip */
   .metric-strip { display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
   .metric {
@@ -66,23 +69,23 @@ st.markdown("""
   }
   .metric .val { font-size:1.5rem; font-weight:600; font-family:'DM Mono',monospace; color:#f0c040; }
   .metric .lbl { font-size:.75rem; color:#666; margin-top:2px; }
-
+ 
   /* Category pill */
   .pill {
     display:inline-block; padding:2px 10px; border-radius:20px;
     font-size:.75rem; font-weight:500; background:#2a2a38; color:#c9c7c0;
   }
-
+ 
   /* Redact warning */
   .redact-warn {
     background:#1f1008; border:1px solid #f59e0b44;
     border-radius:8px; padding:12px 16px; font-size:.83rem; color:#d97706;
     margin-bottom:12px;
   }
-
+ 
   /* Override Streamlit dataframe for dark theme */
   .stDataFrame { border-radius:8px; overflow:hidden; }
-
+ 
   /* Buttons */
   .stButton button {
     border-radius:8px !important; font-weight:500 !important;
@@ -92,7 +95,7 @@ st.markdown("""
     background:#f0c040 !important; color:#0f0f13 !important; border:none !important;
   }
   .stButton button[kind="primary"]:hover { background:#e5b830 !important; }
-
+ 
   /* Download button */
   .stDownloadButton button {
     background:#1e1e28 !important; border:1px solid #2a2a38 !important;
@@ -100,7 +103,7 @@ st.markdown("""
   }
 </style>
 """, unsafe_allow_html=True)
-
+ 
 # ── Constants ─────────────────────────────────────────────────────────────────
 COLORS_RGB = {
     "Yellow": (1,1,0), "Green":(0,1,0.4),
@@ -130,7 +133,7 @@ DEMO_DATA = [
     {"date": "08 Apr 2026", "name": "AMPOL TALLAROOK 30026F",        "amount": -11.00,   "category": "Transport"},
     {"date": "08 Apr 2026", "name": "DANG GOOD CAFE",                "amount": -17.60,   "category": "Food & Dining"},
 ]
-
+ 
 CATEGORY_COLORS = {
     "Food & Dining":"#f59e0b",   "Transport":"#60a5fa",
     "Shopping":"#a78bfa",        "Entertainment":"#f472b6",
@@ -138,7 +141,7 @@ CATEGORY_COLORS = {
     "Travel":"#fb923c",          "Subscriptions":"#e879f9",
     "Income":"#4ade80",          "Unknown":"#6b7280",
 }
-
+ 
 # ── Session state ─────────────────────────────────────────────────────────────
 for k,v in [
     ("step", 1),
@@ -153,7 +156,7 @@ for k,v in [
 ]:
     if k not in st.session_state:
         st.session_state[k] = v
-
+ 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def render_page_b64(pdf_bytes, page_num, zoom):
@@ -161,7 +164,7 @@ def render_page_b64(pdf_bytes, page_num, zoom):
     pix = doc[page_num].get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
     doc.close()
     return base64.b64encode(pix.tobytes("png")).decode(), pix.width, pix.height
-
+ 
 def snap_to_words(pdf_bytes, page_num, rect):
     x0,y0,x1,y1 = rect
     hits = []
@@ -172,7 +175,7 @@ def snap_to_words(pdf_bytes, page_num, rect):
     if not hits:
         return rect
     return min(h[0] for h in hits),min(h[1] for h in hits),max(h[2] for h in hits),max(h[3] for h in hits)
-
+ 
 def apply_redactions(original_bytes, annotations):
     """Burn redactions into a new PDF bytes object."""
     doc = fitz.open(stream=original_bytes, filetype="pdf")
@@ -185,7 +188,7 @@ def apply_redactions(original_bytes, annotations):
     doc.save(buf)
     doc.close()
     return buf.getvalue()
-
+ 
 def extract_text_all_pages(pdf_bytes):
     """Extract text from all pages of a PDF."""
     text = ""
@@ -195,7 +198,7 @@ def extract_text_all_pages(pdf_bytes):
             if t:
                 text += f"\n--- Page {i+1} ---\n{t}"
     return text.strip()
-
+ 
 def make_figure(b64, img_w, img_h, annotations, pending, zm):
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=[0,img_w],y=[0,img_h],mode="markers",
@@ -237,7 +240,7 @@ def make_figure(b64, img_w, img_h, annotations, pending, zm):
         shapes=shapes,plot_bgcolor="#1a1a1a",paper_bgcolor="#1a1a1a",
     )
     return fig
-
+ 
 def categorize_with_gemini(text):
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-2.0-flash')
@@ -246,7 +249,7 @@ Return ONLY a JSON array. Each object must have exactly these keys:
 "date" (string), "name" (string), "amount" (number, negative=debit positive=credit),
 "category" (one of: Food & Dining, Transport, Shopping, Entertainment, Health,
 Utilities, Travel, Subscriptions, Income, Unknown).
-
+ 
 Bank statement text:
 {text}
 """
@@ -259,12 +262,12 @@ Bank statement text:
     if raw.startswith("```"):
         raw = "\n".join(raw.split("\n")[1:-1])
     return json.loads(raw)
-
+ 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 💳 Expense AI")
     st.markdown("---")
-
+ 
     # Step progress
     steps = [
         (1, "Upload statement"),
@@ -278,9 +281,9 @@ with st.sidebar:
             <div class="step-num {cls}">{icon}</div>
             <div class="step-text"><b>{label}</b></div>
         </div>""", unsafe_allow_html=True)
-
+ 
     st.markdown("---")
-
+ 
     if st.session_state.step == 2:
         st.markdown("**Redaction tools**")
         color = st.selectbox("Highlight colour", list(COLORS_RGB.keys()))
@@ -301,19 +304,19 @@ with st.sidebar:
         color = "Yellow"
         snap = True
         zoom = st.session_state.zoom
-
+ 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown("# 💳 Expense Categorizer")
 st.markdown("*AI-powered bank statement analysis with privacy-first redaction*")
 st.markdown("---")
-
+ 
 # ═══════════════════════════════════════════════════════════
 # STEP 1 + 2 — Upload & Redact (single combined page)
 # ═══════════════════════════════════════════════════════════
 if st.session_state.step in (1, 2):
-
+ 
     pdf_loaded = st.session_state.pdf_bytes is not None
-
+ 
     # ── Top action bar (always visible once PDF loaded) ───────────────────
     if pdf_loaded:
         pdf_bytes = st.session_state.pdf_bytes
@@ -323,7 +326,7 @@ if st.session_state.step in (1, 2):
         zm = st.session_state.zoom
         pk = str(pn)
         rd_total = sum(len(v) for v in st.session_state.annotations.values())
-
+ 
         # ── Sticky action bar ─────────────────────────────────────────────
         st.markdown("#### Redaction tools")
         bar1, bar2, bar3, bar4, bar5 = st.columns([2, 2, 2, 2, 1])
@@ -366,7 +369,7 @@ if st.session_state.step in (1, 2):
                 st.session_state.step = 1
                 render_page_b64.clear()
                 st.rerun()
-
+ 
         # Pending selection status
         if st.session_state.pending:
             st.markdown('<div class="info-box red">🔴 Selection ready — click <b>Redact Selection</b> to black it out</div>', unsafe_allow_html=True)
@@ -374,7 +377,7 @@ if st.session_state.step in (1, 2):
             rd_count_pg = len(st.session_state.annotations.get(pk, []))
             status = f"⬛ {rd_count_pg} redaction{'s' if rd_count_pg!=1 else ''} on this page" if rd_count_pg else "🖱️ Drag on the document to select an area to redact"
             st.markdown(f'<div class="info-box">{status}</div>', unsafe_allow_html=True)
-
+ 
         # Handle button actions
         if redact_btn:
             if st.session_state.pending:
@@ -385,7 +388,7 @@ if st.session_state.step in (1, 2):
                     {"rect":[x0,y0,x1,y1],"color":"black","type":"redact"})
                 st.session_state.pending = None
                 st.rerun()
-
+ 
         if undo_btn:
             if st.session_state.annotations.get(pk):
                 st.session_state.annotations[pk].pop()
@@ -393,7 +396,7 @@ if st.session_state.step in (1, 2):
                     del st.session_state.annotations[pk]
             st.session_state.pending = None
             st.rerun()
-
+ 
         if analyse_btn:
             with st.spinner("Applying redactions…"):
                 if st.session_state.annotations:
@@ -403,17 +406,17 @@ if st.session_state.step in (1, 2):
                     st.session_state.redacted_pdf_bytes = pdf_bytes
             st.session_state.step = 3
             st.rerun()
-
+ 
         # ── PDF viewer ────────────────────────────────────────────────────
         b64, img_w, img_h = render_page_b64(pdf_bytes, pn, zm)
         fig = make_figure(b64, img_w, img_h,
                           st.session_state.annotations.get(pk, []),
                           st.session_state.pending, zm)
-
+ 
         event = st.plotly_chart(fig, use_container_width=False,
                                 key=f"chart_{pn}_{zm}",
                                 on_select="rerun", selection_mode=["box"])
-
+ 
         # Parse box-select → PDF coords
         try:
             box = (event.selection.box or [{}])[0]
@@ -425,17 +428,17 @@ if st.session_state.step in (1, 2):
                     st.rerun()
         except Exception:
             pass
-
+ 
     # ── Upload area + info cards (hidden once PDF is loaded) ──────────────
     if not pdf_loaded:
         st.markdown("### Upload your bank statement")
-
+ 
     up_col, info_col = st.columns([2, 1]) if not pdf_loaded else (st.container(), None)
-
+ 
     with (up_col if not pdf_loaded else st.container()):
         if not pdf_loaded:
             st.markdown('<div class="info-box">Upload a PDF bank statement. You can redact sensitive information (account numbers, BSB, personal details) before the AI reads it.</div>', unsafe_allow_html=True)
-
+ 
         uploaded = st.file_uploader(
             "Upload PDF", type=["pdf"],
             label_visibility="collapsed" if pdf_loaded else "visible",
@@ -451,7 +454,7 @@ if st.session_state.step in (1, 2):
                 st.session_state.step = 2
                 render_page_b64.clear()
                 st.rerun()
-
+ 
         if not pdf_loaded:
             st.markdown("---")
             st.markdown('<p style="color:#555;font-size:.8rem;margin-bottom:8px">⚡ DEVELOPER SHORTCUT</p>', unsafe_allow_html=True)
@@ -462,7 +465,7 @@ if st.session_state.step in (1, 2):
                 st.session_state.annotations = {}
                 st.session_state.step = 3
                 st.rerun()
-
+ 
     if not pdf_loaded and info_col is not None:
         with info_col:
             st.markdown("""<div class="card">
@@ -477,19 +480,19 @@ if st.session_state.step in (1, 2):
                 <h3>📊 Instant insights</h3>
                 <p>See spending by category with totals and a breakdown table.</p>
             </div>""", unsafe_allow_html=True)
-
+ 
 # ═══════════════════════════════════════════════════════════
 # STEP 3 — Categorize
 # ═══════════════════════════════════════════════════════════
 elif st.session_state.step == 3:
     st.markdown("### Step 3 — AI Expense Categorization")
-
+ 
     rd_count = sum(len(v) for v in st.session_state.annotations.values())
     if rd_count:
         st.markdown(f'<div class="info-box green">🔒 {rd_count} redaction{"s" if rd_count!=1 else ""} applied — the AI will not see that content.</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="info-box blue">ℹ️ No redactions applied. The full document will be analysed.</div>', unsafe_allow_html=True)
-
+ 
     col_btn1, col_btn2, _ = st.columns([1,1,3])
     with col_btn1:
         run = st.button("🤖 Categorize Transactions", type="primary", use_container_width=True)
@@ -497,7 +500,7 @@ elif st.session_state.step == 3:
         if st.button("← Back to Redaction", use_container_width=True):
             st.session_state.step = 2
             st.rerun()
-
+ 
     if run:
         with st.spinner("Extracting text and sending to Gemini…"):
             try:
@@ -511,11 +514,11 @@ elif st.session_state.step == 3:
             except Exception as e:
                 st.error(f"Gemini error: {e}")
                 st.stop()
-
+ 
     if st.session_state.categorized and st.session_state.transactions:
         data = st.session_state.transactions
         df = pd.DataFrame(data)
-
+ 
         # Parse amounts — handles raw floats (demo) and "$-1,234.56" strings (Gemini/CSV)
         def parse_amount(v):
             if isinstance(v, (int, float)): return float(v)
@@ -523,43 +526,33 @@ elif st.session_state.step == 3:
             try: return float(s)
             except ValueError: return 0.0
         df["amount"] = df["amount"].map(parse_amount)
-
-        # ── Metrics & charts use the editor's state from session_state ─────────
-        # st.data_editor returns the current state on every rerun, so we read
-        # it via session_state to get the latest edits even before the widget
-        # is rendered this pass.
-        raw_edited = st.session_state.get("tx_editor", None)
-        if raw_edited is not None:
-            df_edited = pd.DataFrame(raw_edited)
-            df_edited["amount"] = df_edited["amount"].map(parse_amount)
-        else:
-            df_edited = df.copy()
-
-        # ── Metrics (driven by edited data) ──────────────────────────────────
-        total_spend  = df_edited[df_edited["amount"] < 0]["amount"].sum()
-        total_income = df_edited[df_edited["amount"] > 0]["amount"].sum()
-        n_tx         = len(df_edited)
-        top_cat      = (df_edited[df_edited["amount"]<0]
+ 
+        # ── Metrics ──────────────────────────────────────────────────────────
+        total_spend  = df[df["amount"] < 0]["amount"].sum()
+        total_income = df[df["amount"] > 0]["amount"].sum()
+        n_tx         = len(df)
+        top_cat      = (df[df["amount"]<0]
                         .groupby("category")["amount"].sum().idxmin()
-                        if len(df_edited[df_edited["amount"]<0]) else "—")
-
+                        if len(df[df["amount"]<0]) else "—")
+        df_edited = df.copy()
+ 
         st.markdown(f"""<div class="metric-strip">
             <div class="metric"><div class="val">{n_tx}</div><div class="lbl">Transactions</div></div>
             <div class="metric"><div class="val" style="color:#f87171">${abs(total_spend):,.2f}</div><div class="lbl">Total Spent</div></div>
             <div class="metric"><div class="val" style="color:#34d399">${total_income:,.2f}</div><div class="lbl">Total Income</div></div>
             <div class="metric"><div class="val" style="font-size:1rem;padding-top:4px">{top_cat}</div><div class="lbl">Biggest Category</div></div>
         </div>""", unsafe_allow_html=True)
-
+ 
         # ── Category pie + vendor tables (driven by edited data) ─────────────
         spend_df = df_edited[df_edited["amount"] < 0].copy()
         spend_df["amount_abs"] = spend_df["amount"].abs()
-
+ 
         cat_totals = (spend_df.groupby("category")["amount_abs"]
                       .sum().sort_values(ascending=False))
-
+ 
         if not cat_totals.empty:
             pie_col, vendor_col = st.columns([1, 1])
-
+ 
             # ── Pie chart ────────────────────────────────────────────────
             with pie_col:
                 st.markdown("#### Spending by Category")
@@ -569,13 +562,13 @@ elif st.session_state.step == 3:
                     key="pie_mode",
                 )
                 show_pct = pie_mode == "Percentage (%)"
-
+ 
                 total_spend_abs = cat_totals.sum()
                 customdata = [
                     [f"{v/total_spend_abs*100:.1f}%", f"${v:,.2f}"]
                     for v in cat_totals.values
                 ]
-
+ 
                 fig_pie = go.Figure(go.Pie(
                     labels=cat_totals.index.tolist(),
                     values=cat_totals.values.tolist(),
@@ -596,7 +589,7 @@ elif st.session_state.step == 3:
                     textposition="outside",
                     pull=[0.03] * len(cat_totals),
                 ))
-
+ 
                 # Centre annotation
                 centre_text = f"${total_spend_abs:,.0f}" if not show_pct else "100%"
                 fig_pie.update_layout(
@@ -612,12 +605,12 @@ elif st.session_state.step == 3:
                     )],
                 )
                 st.plotly_chart(fig_pie, use_container_width=True)
-
+ 
             # ── Vendor tables ────────────────────────────────────────────
             with vendor_col:
                 st.markdown("#### Top Vendors")
                 vtab1, vtab2 = st.tabs(["💰 By Value", "🔢 By Charges"])
-
+ 
                 with vtab1:
                     by_value = (spend_df.groupby("name")["amount_abs"]
                                 .sum()
@@ -636,7 +629,7 @@ elif st.session_state.step == 3:
                             "Total Spent": st.column_config.TextColumn("Total Spent"),
                         },
                     )
-
+ 
                 with vtab2:
                     by_count = (spend_df.groupby("name")
                                 .agg(Charges=("amount_abs", "count"),
@@ -657,28 +650,7 @@ elif st.session_state.step == 3:
                             "Total Spent": st.column_config.TextColumn("Total Spent"),
                         },
                     )
-
-        # ── Transaction table (below charts) ─────────────────────────────────
-        st.markdown("#### All Transactions")
-        categories = list(CATEGORY_COLORS.keys())
-        df_display = df.copy()
-        df_display["amount"] = df_display["amount"].map(lambda x: f"${x:+,.2f}")
-
-        edited = st.data_editor(
-            df_display,
-            column_config={
-                "category": st.column_config.SelectboxColumn(
-                    "Category", options=categories, required=True
-                ),
-                "amount": st.column_config.TextColumn("Amount"),
-                "date":   st.column_config.TextColumn("Date"),
-                "name":   st.column_config.TextColumn("Merchant"),
-            },
-            use_container_width=True,
-            hide_index=True,
-            key="tx_editor",
-        )
-
+ 
         # ── Downloads ─────────────────────────────────────────────────────────
         st.markdown("---")
         d1, d2, d3 = st.columns(3)
