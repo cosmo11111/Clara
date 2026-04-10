@@ -524,11 +524,39 @@ elif st.session_state.step == 3:
             except ValueError: return 0.0
         df["amount"] = df["amount"].map(parse_amount)
 
-        # ── Metrics ──────────────────────────────────────────────────────────
-        total_spend  = df[df["amount"] < 0]["amount"].sum()
-        total_income = df[df["amount"] > 0]["amount"].sum()
-        n_tx         = len(df)
-        top_cat      = df[df["amount"]<0].groupby("category")["amount"].sum().idxmin() if len(df[df["amount"]<0]) else "—"
+        # ── Transaction table ────────────────────────────────────────────────
+        # Sits above charts so every edit immediately re-drives the visuals
+        st.markdown("#### All Transactions")
+        categories = list(CATEGORY_COLORS.keys())
+        df_display = df.copy()
+        df_display["amount"] = df_display["amount"].map(lambda x: f"${x:+,.2f}")
+
+        edited = st.data_editor(
+            df_display,
+            column_config={
+                "category": st.column_config.SelectboxColumn(
+                    "Category", options=categories, required=True
+                ),
+                "amount": st.column_config.TextColumn("Amount"),
+                "date":   st.column_config.TextColumn("Date"),
+                "name":   st.column_config.TextColumn("Merchant"),
+            },
+            use_container_width=True,
+            hide_index=True,
+            key="tx_editor",
+        )
+
+        # Parse edited amounts back to floats — all charts use this df
+        df_edited = pd.DataFrame(edited)
+        df_edited["amount"] = df_edited["amount"].map(parse_amount)
+
+        # ── Metrics (driven by edited data) ──────────────────────────────────
+        total_spend  = df_edited[df_edited["amount"] < 0]["amount"].sum()
+        total_income = df_edited[df_edited["amount"] > 0]["amount"].sum()
+        n_tx         = len(df_edited)
+        top_cat      = (df_edited[df_edited["amount"]<0]
+                        .groupby("category")["amount"].sum().idxmin()
+                        if len(df_edited[df_edited["amount"]<0]) else "—")
 
         st.markdown(f"""<div class="metric-strip">
             <div class="metric"><div class="val">{n_tx}</div><div class="lbl">Transactions</div></div>
@@ -537,8 +565,8 @@ elif st.session_state.step == 3:
             <div class="metric"><div class="val" style="font-size:1rem;padding-top:4px">{top_cat}</div><div class="lbl">Biggest Category</div></div>
         </div>""", unsafe_allow_html=True)
 
-        # ── Category pie + vendor tables ─────────────────────────────────────
-        spend_df = df[df["amount"] < 0].copy()
+        # ── Category pie + vendor tables (driven by edited data) ─────────────
+        spend_df = df_edited[df_edited["amount"] < 0].copy()
         spend_df["amount_abs"] = spend_df["amount"].abs()
 
         cat_totals = (spend_df.groupby("category")["amount_abs"]
@@ -645,34 +673,11 @@ elif st.session_state.step == 3:
                         },
                     )
 
-        # ── Transaction table ─────────────────────────────────────────────────
-        st.markdown("#### All Transactions")
-
-        # Allow manual category edits
-        categories = list(CATEGORY_COLORS.keys())
-        df_display = df.copy()
-        df_display["amount"] = df_display["amount"].map(lambda x: f"${x:+,.2f}")
-
-        edited = st.data_editor(
-            df_display,
-            column_config={
-                "category": st.column_config.SelectboxColumn(
-                    "Category", options=categories, required=True
-                ),
-                "amount": st.column_config.TextColumn("Amount"),
-                "date":   st.column_config.TextColumn("Date"),
-                "name":   st.column_config.TextColumn("Merchant"),
-            },
-            use_container_width=True,
-            hide_index=True,
-            key="tx_editor",
-        )
-
         # ── Downloads ─────────────────────────────────────────────────────────
         st.markdown("---")
         d1, d2, d3 = st.columns(3)
         with d1:
-            csv = pd.DataFrame(edited).to_csv(index=False)
+            csv = df_edited.copy().assign(amount=df_edited["amount"].map(lambda x: f"${x:+,.2f}")).to_csv(index=False)
             st.download_button("⬇️ Download CSV", data=csv,
                                file_name="expenses.csv", mime="text/csv",
                                use_container_width=True)
