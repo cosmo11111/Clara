@@ -524,31 +524,16 @@ elif st.session_state.step == 3:
             except ValueError: return 0.0
         df["amount"] = df["amount"].map(parse_amount)
 
-        # ── Transaction table ────────────────────────────────────────────────
-        # Sits above charts so every edit immediately re-drives the visuals
-        st.markdown("#### All Transactions")
-        categories = list(CATEGORY_COLORS.keys())
-        df_display = df.copy()
-        df_display["amount"] = df_display["amount"].map(lambda x: f"${x:+,.2f}")
-
-        edited = st.data_editor(
-            df_display,
-            column_config={
-                "category": st.column_config.SelectboxColumn(
-                    "Category", options=categories, required=True
-                ),
-                "amount": st.column_config.TextColumn("Amount"),
-                "date":   st.column_config.TextColumn("Date"),
-                "name":   st.column_config.TextColumn("Merchant"),
-            },
-            use_container_width=True,
-            hide_index=True,
-            key="tx_editor",
-        )
-
-        # Parse edited amounts back to floats — all charts use this df
-        df_edited = pd.DataFrame(edited)
-        df_edited["amount"] = df_edited["amount"].map(parse_amount)
+        # ── Metrics & charts use the editor's state from session_state ─────────
+        # st.data_editor returns the current state on every rerun, so we read
+        # it via session_state to get the latest edits even before the widget
+        # is rendered this pass.
+        raw_edited = st.session_state.get("tx_editor", None)
+        if raw_edited is not None:
+            df_edited = pd.DataFrame(raw_edited)
+            df_edited["amount"] = df_edited["amount"].map(parse_amount)
+        else:
+            df_edited = df.copy()
 
         # ── Metrics (driven by edited data) ──────────────────────────────────
         total_spend  = df_edited[df_edited["amount"] < 0]["amount"].sum()
@@ -672,6 +657,27 @@ elif st.session_state.step == 3:
                             "Total Spent": st.column_config.TextColumn("Total Spent"),
                         },
                     )
+
+        # ── Transaction table (below charts) ─────────────────────────────────
+        st.markdown("#### All Transactions")
+        categories = list(CATEGORY_COLORS.keys())
+        df_display = df.copy()
+        df_display["amount"] = df_display["amount"].map(lambda x: f"${x:+,.2f}")
+
+        edited = st.data_editor(
+            df_display,
+            column_config={
+                "category": st.column_config.SelectboxColumn(
+                    "Category", options=categories, required=True
+                ),
+                "amount": st.column_config.TextColumn("Amount"),
+                "date":   st.column_config.TextColumn("Date"),
+                "name":   st.column_config.TextColumn("Merchant"),
+            },
+            use_container_width=True,
+            hide_index=True,
+            key="tx_editor",
+        )
 
         # ── Downloads ─────────────────────────────────────────────────────────
         st.markdown("---")
