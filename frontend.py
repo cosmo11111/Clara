@@ -651,11 +651,20 @@ elif st.session_state.step == 3:
             try: return float(s)
             except ValueError: return 0.0
 
-        # Build df_edited from tx_rows — this is the live working copy.
-        # tx_rows is already mutated by any pending delete/add above,
-        # so metrics and charts always reflect the current state.
-        _rows_now = st.session_state.get("tx_rows",
-                    df[["date","name","amount","category"]].to_dict("records"))
+        # Build df_edited from tx_rows, with widget state overlaid.
+        # This means category changes and typed edits show in charts immediately.
+        _rows_now = list(st.session_state.get("tx_rows",
+                    df[["date","name","amount","category"]].to_dict("records")))
+        # Overlay any widget state that exists (from previous render)
+        for _i, _r in enumerate(_rows_now):
+            if f"td_{_i}_date" in st.session_state:
+                _r["date"]     = st.session_state[f"td_{_i}_date"]
+            if f"td_{_i}_name" in st.session_state:
+                _r["name"]     = st.session_state[f"td_{_i}_name"]
+            if f"td_{_i}_amt" in st.session_state:
+                _r["amount"]   = st.session_state[f"td_{_i}_amt"]
+            if f"td_{_i}_cat" in st.session_state:
+                _r["category"] = st.session_state[f"td_{_i}_cat"]
         df_edited = pd.DataFrame(_rows_now) if _rows_now else df[["date","name","amount","category"]].copy()
         df_edited["amount"] = df_edited["amount"].map(parse_amount)
 
@@ -837,26 +846,26 @@ elif st.session_state.step == 3:
         new_cats_needed   = []
 
         # ── Render each row ───────────────────────────────────────────────────
+        # IMPORTANT: we do NOT write widget values back to rows[] during render.
+        # Widget state lives in st.session_state under td_{i}_* keys.
+        # We only sync back to tx_rows when delete/add fires (via rerun).
         for i, row in enumerate(rows):
             c_date, c_name, c_amt, c_cat, c_del = st.columns([1.3, 3.0, 1.3, 3.4, 0.6])
 
             with c_date:
-                new_val = st.text_input("Date", value=str(row.get("date","")),
-                                        label_visibility="collapsed",
-                                        key=f"td_{i}_date", placeholder="DD MMM YYYY")
-                rows[i]["date"] = new_val
+                st.text_input("Date", value=str(row.get("date","")),
+                              label_visibility="collapsed",
+                              key=f"td_{i}_date", placeholder="DD MMM YYYY")
 
             with c_name:
-                new_val = st.text_input("Merchant", value=str(row.get("name","")),
-                                        label_visibility="collapsed",
-                                        key=f"td_{i}_name", placeholder="Merchant")
-                rows[i]["name"] = new_val
+                st.text_input("Merchant", value=str(row.get("name","")),
+                              label_visibility="collapsed",
+                              key=f"td_{i}_name", placeholder="Merchant")
 
             with c_amt:
-                new_val = st.text_input("Amount", value=str(row.get("amount","")),
-                                        label_visibility="collapsed",
-                                        key=f"td_{i}_amt", placeholder="0.00")
-                rows[i]["amount"] = new_val
+                st.text_input("Amount", value=str(row.get("amount","")),
+                              label_visibility="collapsed",
+                              key=f"td_{i}_amt", placeholder="0.00")
 
             with c_cat:
                 prev_cat = str(row.get("category","Unknown"))
@@ -876,7 +885,6 @@ elif st.session_state.step == 3:
                             vendor_rule_queue.append((vendor, new_cat))
 
             with c_del:
-                # Use on_click callback — fires before rerun so state is clean
                 def _make_delete_cb(idx):
                     def _cb():
                         st.session_state._tx_pending_delete = idx
@@ -886,12 +894,19 @@ elif st.session_state.step == 3:
                           help="Delete this row",
                           use_container_width=True)
 
-        # Persist row edits
-        st.session_state.tx_rows = rows
-
-        # Auto-save vendor rules
+        # Auto-save vendor rules from category changes
         for vendor, category in vendor_rule_queue:
             save_vendor_rule(uid, vendor, category, "contains")
+
+        # ── Sync widget state → tx_rows before building df_edited ────────────
+        # Read every td_* widget back into rows so df_edited reflects
+        # whatever the user has typed, including new/edited rows.
+        for i in range(len(rows)):
+            rows[i]["date"]   = st.session_state.get(f"td_{i}_date",   rows[i].get("date",""))
+            rows[i]["name"]   = st.session_state.get(f"td_{i}_name",   rows[i].get("name",""))
+            rows[i]["amount"] = st.session_state.get(f"td_{i}_amt",    rows[i].get("amount",""))
+            rows[i]["category"] = st.session_state.get(f"td_{i}_cat",  rows[i].get("category","Unknown"))
+        st.session_state.tx_rows = rows
 
         # ── Add transaction button ─────────────────────────────────────────────
         def _add_row_cb():
@@ -900,8 +915,7 @@ elif st.session_state.step == 3:
         st.button("＋  Add transaction", use_container_width=True,
                   on_click=_add_row_cb, key="add_tx_btn")
 
-        # ── Rebuild df_edited from live rows + persist ───────────────────────
-        st.session_state.tx_rows = rows  # persist any inline field edits
+        # ── Build df_edited from synced rows ──────────────────────────────────
         df_edited = pd.DataFrame(rows) if rows else pd.DataFrame(
             columns=["date","name","amount","category"])
         df_edited["amount"] = df_edited["amount"].map(parse_amount)
