@@ -817,13 +817,13 @@ elif st.session_state.step == 3:
             st.session_state.tx_rows_source = _src_key
 
         # ── Handle pending actions set by callbacks ──────────────────────────
-        # on_click fires BEFORE the rerun, so these are processed first.
-        # We explicitly rerun after mutation so widgets re-index from scratch.
         if st.session_state.get("_tx_pending_delete") is not None:
             idx = st.session_state.pop("_tx_pending_delete")
+            st.info(f"🐛 DEBUG: deleting idx={idx}, rows before={len(st.session_state.tx_rows)}, "
+                    f"rows={[r.get('name','?') for r in st.session_state.tx_rows]}")
             if 0 <= idx < len(st.session_state.tx_rows):
                 st.session_state.tx_rows.pop(idx)
-            # Wipe all td_ widget state so row keys re-index cleanly
+            st.info(f"🐛 DEBUG: rows after={len(st.session_state.tx_rows)}")
             for k in [k for k in st.session_state if k.startswith("td_")]:
                 del st.session_state[k]
             st.rerun()
@@ -844,6 +844,14 @@ elif st.session_state.step == 3:
         rows = st.session_state.tx_rows
         vendor_rule_queue = []
         new_cats_needed   = []
+
+        # ── Debug: show current tx_rows state ────────────────────────────────
+        with st.expander("🐛 DEBUG — tx_rows state", expanded=True):
+            st.write(f"Total rows: {len(rows)}")
+            for _di, _dr in enumerate(rows):
+                st.write(f"  [{_di}] {_dr.get('name','?')} | {_dr.get('amount','?')} | {_dr.get('category','?')}")
+            td_keys = {k: v for k, v in st.session_state.items() if k.startswith("td_")}
+            st.write(f"td_ widget keys: {list(td_keys.keys())}")
 
         # ── Render each row ───────────────────────────────────────────────────
         # IMPORTANT: we do NOT write widget values back to rows[] during render.
