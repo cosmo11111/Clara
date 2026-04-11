@@ -90,6 +90,51 @@ st.markdown("""
   /* Override Streamlit dataframe for dark theme */
   .stDataFrame { border-radius:8px; overflow:hidden; }
 
+  /* Custom expense table */
+  .tx-table { width:100%; border-collapse:collapse; margin-bottom:0; }
+  .tx-table th {
+    background:#17171d; color:#666; font-size:.75rem; font-weight:500;
+    padding:8px 10px; text-align:left; border-bottom:1px solid #2a2a38;
+    text-transform:uppercase; letter-spacing:.04em;
+  }
+  .tx-table td { padding:2px 4px; border-bottom:1px solid #1e1e28; vertical-align:middle; }
+  .tx-table tr:hover td { background:#1a1a24; }
+  .tx-table tr:last-child td { border-bottom:none; }
+
+  /* Make inputs inside table rows look flush */
+  .tx-table .stTextInput input {
+    background:transparent !important; border:none !important;
+    border-radius:0 !important; padding:6px 6px !important;
+    font-size:.85rem !important; color:#e8e6e1 !important;
+  }
+  .tx-table .stTextInput input:focus {
+    background:#1e1e28 !important; border-radius:4px !important;
+    box-shadow:none !important;
+  }
+  .tx-table .stSelectbox > div > div {
+    background:transparent !important; border:none !important;
+    font-size:.85rem !important;
+  }
+  /* Delete button — small, subtle red */
+  .tx-table .del-btn button {
+    background:transparent !important; border:none !important;
+    color:#666 !important; font-size:.9rem !important;
+    padding:4px 8px !important; min-height:0 !important;
+    line-height:1 !important; width:100% !important;
+  }
+  .tx-table .del-btn button:hover { color:#f87171 !important; background:#1f0f0f !important; }
+
+  /* Add transaction button */
+  .add-tx-btn button {
+    background:#1e1e28 !important; border:1px dashed #2a2a38 !important;
+    color:#888 !important; border-radius:8px !important;
+    font-size:.85rem !important; transition: all .15s !important;
+  }
+  .add-tx-btn button:hover {
+    border-color:#f0c040 !important; color:#f0c040 !important;
+    background:#1e1e24 !important;
+  }
+
   /* Buttons */
   .stButton button {
     border-radius:8px !important; font-weight:500 !important;
@@ -747,101 +792,97 @@ elif st.session_state.step == 3:
         cat_options = cat_names + [ADD_NEW_SENTINEL]
 
         # ── Row state ─────────────────────────────────────────────────────────
-        # Keep rows in session_state so add/delete persists across reruns.
-        # Re-initialise whenever the source df changes (new upload / demo load).
         if "tx_rows" not in st.session_state or st.session_state.get("tx_rows_source") != id(df):
             st.session_state.tx_rows = df[["date","name","amount","category"]].copy().to_dict("records")
             st.session_state.tx_rows_source = id(df)
 
-        rows = st.session_state.tx_rows
-
-        # ── data_editor — fixed rows, no built-in add/delete toolbar ─────────
-        # We pass the current rows as a fresh DataFrame each render.
-        # Edits come back via the session_state diff as before.
-        df_for_editor = pd.DataFrame(rows)[["date","name","amount","category"]].copy()
-        df_for_editor["amount"] = df_for_editor["amount"].map(
-            lambda x: f"${float(str(x).replace(',','').replace('$','').replace('+','').strip() or 0):+,.2f}"
-            if str(x).strip() else ""
-        )
-        # Add a delete column — checkboxes the user ticks to mark rows for deletion
-        df_for_editor.insert(0, "🗑", False)
-
-        edited = st.data_editor(
-            df_for_editor,
-            column_config={
-                "🗑":       st.column_config.CheckboxColumn("🗑", help="Tick to delete", width="small"),
-                "date":     st.column_config.TextColumn("Date"),
-                "name":     st.column_config.TextColumn("Merchant"),
-                "amount":   st.column_config.TextColumn("Amount"),
-                "category": st.column_config.SelectboxColumn(
-                    "Category", options=cat_options, required=True
-                ),
-            },
-            num_rows="fixed",
-            use_container_width=True,
-            hide_index=True,
-            key="tx_editor",
-        )
-
-        # ── Process edits from data_editor ────────────────────────────────────
-        raw_edits   = st.session_state.get("tx_editor", {})
-        edited_rows = raw_edits.get("edited_rows", {}) if isinstance(raw_edits, dict) else {}
+        rows        = st.session_state.tx_rows
+        delete_idx  = None
         vendor_rule_queue = []
         new_cats_needed   = []
 
-        for row_idx_str, changes in edited_rows.items():
-            row_idx = int(row_idx_str)
-            if row_idx >= len(rows):
-                continue
-            new_cat = changes.get("category")
-            if new_cat == ADD_NEW_SENTINEL:
-                new_cats_needed.append(row_idx)
-            elif new_cat and new_cat in cat_names:
-                rows[row_idx]["category"] = new_cat
-                vendor = str(rows[row_idx].get("name","")).strip()
-                is_unknown = not vendor or vendor.lower() == "unknown"
-                if not is_unknown and uid:
-                    vendor_rule_queue.append((vendor, new_cat))
-            # Sync other field edits back into rows
-            for field in ("date","name","amount"):
-                if field in changes:
-                    rows[row_idx][field] = changes[field]
+        # ── Table header ──────────────────────────────────────────────────────
+        st.markdown('<table class="tx-table"><thead><tr>'
+                    '<th style="width:13%">Date</th>'
+                    '<th style="width:30%">Merchant</th>'
+                    '<th style="width:13%">Amount</th>'
+                    '<th style="width:36%">Category</th>'
+                    '<th style="width:8%"></th>'
+                    '</tr></thead></table>', unsafe_allow_html=True)
 
-        # ── Handle row deletion (checked rows) ────────────────────────────────
-        rows_to_delete = set()
-        for row_idx_str, changes in edited_rows.items():
-            if changes.get("🗑"):
-                rows_to_delete.add(int(row_idx_str))
+        # ── Rows ──────────────────────────────────────────────────────────────
+        for i, row in enumerate(rows):
+            c_date, c_name, c_amt, c_cat, c_del = st.columns([1.3, 3, 1.3, 3.6, 0.8])
 
-        if rows_to_delete:
-            rows = [r for i, r in enumerate(rows) if i not in rows_to_delete]
+            with c_date:
+                val = st.text_input("date", value=str(row.get("date","")),
+                                    label_visibility="collapsed",
+                                    key=f"td_{i}_date", placeholder="DD MMM YYYY")
+                if val != row.get("date",""):
+                    rows[i]["date"] = val
+
+            with c_name:
+                val = st.text_input("merchant", value=str(row.get("name","")),
+                                    label_visibility="collapsed",
+                                    key=f"td_{i}_name", placeholder="Merchant")
+                if val != row.get("name",""):
+                    rows[i]["name"] = val
+
+            with c_amt:
+                val = st.text_input("amount", value=str(row.get("amount","")),
+                                    label_visibility="collapsed",
+                                    key=f"td_{i}_amt", placeholder="0.00")
+                if val != row.get("amount",""):
+                    rows[i]["amount"] = val
+
+            with c_cat:
+                prev_cat = str(row.get("category","Unknown"))
+                if prev_cat not in cat_options:
+                    prev_cat = "Unknown"
+                new_cat = st.selectbox("cat", cat_options,
+                                       index=cat_options.index(prev_cat),
+                                       label_visibility="collapsed",
+                                       key=f"td_{i}_cat")
+                if new_cat != prev_cat:
+                    if new_cat == ADD_NEW_SENTINEL:
+                        new_cats_needed.append(i)
+                    else:
+                        rows[i]["category"] = new_cat
+                        vendor = str(rows[i].get("name","")).strip()
+                        if vendor and vendor.lower() not in ("","unknown") and uid:
+                            vendor_rule_queue.append((vendor, new_cat))
+
+            with c_del:
+                # Vertically nudge button to align with inputs
+                st.markdown("<div class='del-btn' style='padding-top:2px'>",
+                            unsafe_allow_html=True)
+                if st.button("✕", key=f"td_{i}_del", help="Delete row"):
+                    delete_idx = i
+                st.markdown("</div>", unsafe_allow_html=True)
+
+        # Apply deletion after loop — avoids mutating while iterating
+        if delete_idx is not None:
+            rows.pop(delete_idx)
             st.session_state.tx_rows = rows
-            # Clear editor state so checkboxes reset
-            if "tx_editor" in st.session_state:
-                del st.session_state["tx_editor"]
             st.rerun()
 
         # Auto-save vendor rules silently
         for vendor, category in vendor_rule_queue:
             save_vendor_rule(uid, vendor, category, "contains")
 
-        # ── Add expense button (full width below table) ────────────────────────
-        if st.button("＋  Add expense", use_container_width=True):
-            from datetime import date as _date
-            rows.append({
-                "date":     _date.today().strftime("%d %b %Y"),
-                "name":     "",
-                "amount":   "0.00",
-                "category": "Unknown",
-            })
-            st.session_state.tx_rows = rows
-            if "tx_editor" in st.session_state:
-                del st.session_state["tx_editor"]
-            st.rerun()
-
         st.session_state.tx_rows = rows
 
-        # ── Rebuild df_edited from rows for charts/metrics/downloads ──────────
+        # ── Add transaction button ─────────────────────────────────────────────
+        st.markdown("<div class='add-tx-btn'>", unsafe_allow_html=True)
+        if st.button("＋  Add transaction", use_container_width=True):
+            from datetime import date as _date
+            rows.append({"date": _date.today().strftime("%d %b %Y"),
+                         "name": "", "amount": "", "category": "Unknown"})
+            st.session_state.tx_rows = rows
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # ── Rebuild df_edited from rows ───────────────────────────────────────
         df_edited = pd.DataFrame(rows)
         df_edited["amount"] = df_edited["amount"].map(parse_amount)
 
@@ -871,7 +912,7 @@ elif st.session_state.step == 3:
                             for i in new_cats_needed:
                                 rows[i]["category"] = name
                                 vendor = str(rows[i].get("name","")).strip()
-                                if vendor and vendor.lower() != "unknown":
+                                if vendor and vendor.lower() not in ("","unknown"):
                                     save_vendor_rule(uid, vendor, name, "contains")
                             st.session_state.tx_rows = rows
                             st.success(f"✅ '{name}' added!")
