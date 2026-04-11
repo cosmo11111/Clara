@@ -746,110 +746,117 @@ elif st.session_state.step == 3:
         ADD_NEW_SENTINEL = "＋ Add new category…"
         cat_options = cat_names + [ADD_NEW_SENTINEL]
 
-        # ── Row state — keep working rows in session_state so add/delete ──────
-        # persists across reruns without losing edits.
+        # ── Row state ─────────────────────────────────────────────────────────
+        # Keep rows in session_state so add/delete persists across reruns.
+        # Re-initialise whenever the source df changes (new upload / demo load).
         if "tx_rows" not in st.session_state or st.session_state.get("tx_rows_source") != id(df):
-            # Initialise from the base df (or re-init when df changes)
             st.session_state.tx_rows = df[["date","name","amount","category"]].copy().to_dict("records")
             st.session_state.tx_rows_source = id(df)
 
         rows = st.session_state.tx_rows
 
-        # ── Delete button + row header ────────────────────────────────────────
-        # Column widths: date | merchant | amount | category | delete-btn
-        COL_W = [1.2, 2.2, 1.2, 1.8, 0.3]
-        hdr = st.columns(COL_W)
-        for col, label in zip(hdr, ["Date", "Merchant", "Amount", "Category", ""]):
-            col.markdown(f"<p style='font-size:.78rem;color:#666;margin:0;padding:2px 4px'>{label}</p>",
-                         unsafe_allow_html=True)
+        # ── data_editor — fixed rows, no built-in add/delete toolbar ─────────
+        # We pass the current rows as a fresh DataFrame each render.
+        # Edits come back via the session_state diff as before.
+        df_for_editor = pd.DataFrame(rows)[["date","name","amount","category"]].copy()
+        df_for_editor["amount"] = df_for_editor["amount"].map(
+            lambda x: f"${float(str(x).replace(',','').replace('$','').replace('+','').strip() or 0):+,.2f}"
+            if str(x).strip() else ""
+        )
+        # Add a delete column — checkboxes the user ticks to mark rows for deletion
+        df_for_editor.insert(0, "🗑", False)
 
-        vendor_rule_queue = []   # collect auto-rules to save after rendering
+        edited = st.data_editor(
+            df_for_editor,
+            column_config={
+                "🗑":       st.column_config.CheckboxColumn("🗑", help="Tick to delete", width="small"),
+                "date":     st.column_config.TextColumn("Date"),
+                "name":     st.column_config.TextColumn("Merchant"),
+                "amount":   st.column_config.TextColumn("Amount"),
+                "category": st.column_config.SelectboxColumn(
+                    "Category", options=cat_options, required=True
+                ),
+            },
+            num_rows="fixed",
+            use_container_width=True,
+            hide_index=True,
+            key="tx_editor",
+        )
 
-        delete_idx = None  # track which row was deleted this rerun
-        for i, row in enumerate(rows):
-            cols = st.columns(COL_W)
-            with cols[0]:
-                rows[i]["date"] = st.text_input("d", value=str(row.get("date","")),
-                                                 label_visibility="collapsed",
-                                                 key=f"row_date_{i}",
-                                                 placeholder="DD MMM YYYY")
-            with cols[1]:
-                rows[i]["name"] = st.text_input("m", value=str(row.get("name","")),
-                                                 label_visibility="collapsed",
-                                                 key=f"row_name_{i}",
-                                                 placeholder="Merchant")
-            with cols[2]:
-                rows[i]["amount"] = st.text_input("a", value=str(row.get("amount","")),
-                                                   label_visibility="collapsed",
-                                                   key=f"row_amt_{i}",
-                                                   placeholder="0.00")
-            with cols[3]:
-                prev_cat = str(row.get("category", cat_names[0]))
-                if prev_cat not in cat_options:
-                    prev_cat = cat_names[0]
-                new_cat = st.selectbox("c", cat_options,
-                                       index=cat_options.index(prev_cat),
-                                       label_visibility="collapsed",
-                                       key=f"row_cat_{i}")
-                if new_cat != prev_cat:
-                    rows[i]["category"] = new_cat
-                    # Auto-vendor rule if category changed to a real category
-                    vendor = str(row.get("name","")).strip()
-                    is_unknown = not vendor or vendor.lower() == "unknown"
-                    if new_cat != ADD_NEW_SENTINEL and not is_unknown and uid:
-                        vendor_rule_queue.append((vendor, new_cat))
+        # ── Process edits from data_editor ────────────────────────────────────
+        raw_edits   = st.session_state.get("tx_editor", {})
+        edited_rows = raw_edits.get("edited_rows", {}) if isinstance(raw_edits, dict) else {}
+        vendor_rule_queue = []
+        new_cats_needed   = []
 
-            with cols[4]:
-                # Small red X button — top-align with a bit of padding
-                st.markdown("<div style='padding-top:4px'>", unsafe_allow_html=True)
-                if st.button("✕", key=f"del_row_{i}",
-                             help="Delete this row",
-                             use_container_width=True):
-                    delete_idx = i
-                st.markdown("</div>", unsafe_allow_html=True)
+        for row_idx_str, changes in edited_rows.items():
+            row_idx = int(row_idx_str)
+            if row_idx >= len(rows):
+                continue
+            new_cat = changes.get("category")
+            if new_cat == ADD_NEW_SENTINEL:
+                new_cats_needed.append(row_idx)
+            elif new_cat and new_cat in cat_names:
+                rows[row_idx]["category"] = new_cat
+                vendor = str(rows[row_idx].get("name","")).strip()
+                is_unknown = not vendor or vendor.lower() == "unknown"
+                if not is_unknown and uid:
+                    vendor_rule_queue.append((vendor, new_cat))
+            # Sync other field edits back into rows
+            for field in ("date","name","amount"):
+                if field in changes:
+                    rows[row_idx][field] = changes[field]
 
-        # Apply deletion outside the loop so we don't mutate while iterating
-        if delete_idx is not None:
-            rows.pop(delete_idx)
-            # Clear stale widget keys so Streamlit re-renders cleanly
-            stale = [k for k in st.session_state if k.startswith(f"row_") and
-                     any(k.endswith(f"_{delete_idx}") for _ in [None])]
+        # ── Handle row deletion (checked rows) ────────────────────────────────
+        rows_to_delete = set()
+        for row_idx_str, changes in edited_rows.items():
+            if changes.get("🗑"):
+                rows_to_delete.add(int(row_idx_str))
+
+        if rows_to_delete:
+            rows = [r for i, r in enumerate(rows) if i not in rows_to_delete]
             st.session_state.tx_rows = rows
+            # Clear editor state so checkboxes reset
+            if "tx_editor" in st.session_state:
+                del st.session_state["tx_editor"]
             st.rerun()
 
         # Auto-save vendor rules silently
         for vendor, category in vendor_rule_queue:
             save_vendor_rule(uid, vendor, category, "contains")
 
-        # ── Add expense button ────────────────────────────────────────────────
+        # ── Add expense button (full width below table) ────────────────────────
         if st.button("＋  Add expense", use_container_width=True):
             from datetime import date as _date
             rows.append({
                 "date":     _date.today().strftime("%d %b %Y"),
                 "name":     "",
-                "amount":   "",
+                "amount":   "0.00",
                 "category": "Unknown",
             })
             st.session_state.tx_rows = rows
+            if "tx_editor" in st.session_state:
+                del st.session_state["tx_editor"]
             st.rerun()
 
-        # ── Rebuild df_edited from current rows so charts stay in sync ──────
+        st.session_state.tx_rows = rows
+
+        # ── Rebuild df_edited from rows for charts/metrics/downloads ──────────
         df_edited = pd.DataFrame(rows)
         df_edited["amount"] = df_edited["amount"].map(parse_amount)
-        st.session_state.tx_rows = rows  # persist any inline edits
 
-        # ── Sentinel check — show inline "add new category" if needed ─────────
-        sentinel_rows = [i for i, r in enumerate(rows) if r.get("category") == ADD_NEW_SENTINEL]
-        if sentinel_rows:
+        # ── Sentinel: inline add-new-category UI ─────────────────────────────
+        if new_cats_needed:
             st.markdown('<div class="info-box blue">You selected <b>＋ Add new category…</b> — '
                         'enter the name and colour below, then save.</div>', unsafe_allow_html=True)
             nc1, nc2, nc3 = st.columns([3, 2, 1])
             with nc1:
-                inline_cat_name = st.text_input(
-                    "New category name", placeholder="e.g. Pet Care", key="inline_cat_name"
-                )
+                inline_cat_name  = st.text_input("New category name",
+                                                  placeholder="e.g. Pet Care",
+                                                  key="inline_cat_name")
             with nc2:
-                inline_cat_color = st.color_picker("Colour", value="#a78bfa", key="inline_cat_color")
+                inline_cat_color = st.color_picker("Colour", value="#a78bfa",
+                                                    key="inline_cat_color")
             with nc3:
                 st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
                 if st.button("Save category", type="primary", use_container_width=True):
@@ -861,7 +868,7 @@ elif st.session_state.step == 3:
                     else:
                         ok, err = save_category(uid, name, inline_cat_color)
                         if ok:
-                            for i in sentinel_rows:
+                            for i in new_cats_needed:
                                 rows[i]["category"] = name
                                 vendor = str(rows[i].get("name","")).strip()
                                 if vendor and vendor.lower() != "unknown":
