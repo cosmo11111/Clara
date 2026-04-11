@@ -586,14 +586,24 @@ elif st.session_state.step == 3:
             except ValueError: return 0.0
         df["amount"] = df["amount"].map(parse_amount)
 
+        # ── Build df_edited from session_state so charts update atomically ────
+        # st.session_state["tx_editor"] holds the latest table state from the
+        # previous rerun — this means charts always reflect the last edit even
+        # though the table widget renders below them.
+        raw = st.session_state.get("tx_editor")
+        if raw is not None:
+            df_edited = pd.DataFrame(raw)
+            df_edited["amount"] = df_edited["amount"].map(parse_amount)
+        else:
+            df_edited = df.copy()
+
         # ── Metrics ──────────────────────────────────────────────────────────
-        total_spend  = df[df["amount"] < 0]["amount"].sum()
-        total_income = df[df["amount"] > 0]["amount"].sum()
-        n_tx         = len(df)
-        top_cat      = (df[df["amount"]<0]
+        total_spend  = df_edited[df_edited["amount"] < 0]["amount"].sum()
+        total_income = df_edited[df_edited["amount"] > 0]["amount"].sum()
+        n_tx         = len(df_edited)
+        top_cat      = (df_edited[df_edited["amount"]<0]
                         .groupby("category")["amount"].sum().idxmin()
-                        if len(df[df["amount"]<0]) else "—")
-        df_edited = df.copy()
+                        if len(df_edited[df_edited["amount"]<0]) else "—")
 
         st.markdown(f"""<div class="metric-strip">
             <div class="metric"><div class="val">{n_tx}</div><div class="lbl">Transactions</div></div>
@@ -604,6 +614,7 @@ elif st.session_state.step == 3:
 
         # ── Category pie + vendor tables (driven by edited data) ─────────────
         spend_df = df_edited[df_edited["amount"] < 0].copy()
+        spend_df["name"] = spend_df["name"].astype(str)
         spend_df["amount_abs"] = spend_df["amount"].abs()
 
         cat_totals = (spend_df.groupby("category")["amount_abs"]
