@@ -8,6 +8,12 @@ import plotly.graph_objects as go
 import google.generativeai as genai
 import pandas as pd
 from auth import require_auth, get_user, clear_session, get_supabase
+from db import (
+    load_categories, save_category, delete_category,
+    load_vendor_rules, apply_vendor_rules, save_vendor_rule, delete_vendor_rule,
+    save_report, load_reports, load_report_items, delete_report,
+    DEFAULT_CATEGORY_COLORS,
+)
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Expense Categorizer", page_icon="💳", layout="wide")
@@ -132,13 +138,8 @@ DEMO_DATA = [
     {"date": "08 Apr 2026", "name": "DANG GOOD CAFE",                "amount": -17.60,   "category": "Food & Dining"},
 ]
 
-CATEGORY_COLORS = {
-    "Food & Dining":"#f59e0b",   "Transport":"#60a5fa",
-    "Shopping":"#a78bfa",        "Entertainment":"#f472b6",
-    "Health":"#34d399",          "Utilities":"#94a3b8",
-    "Travel":"#fb923c",          "Subscriptions":"#e879f9",
-    "Income":"#4ade80",          "Unknown":"#6b7280",
-}
+# CATEGORY_COLORS now lives in db.py as DEFAULT_CATEGORY_COLORS
+CATEGORY_COLORS = DEFAULT_CATEGORY_COLORS
 
 # ── Session state ─────────────────────────────────────────────────────────────
 for k,v in [
@@ -239,27 +240,33 @@ def make_figure(b64, img_w, img_h, annotations, pending, zm):
     )
     return fig
 
-def categorize_with_gemini(text):
+def categorize_with_gemini(text, all_categories: dict, vendor_rules: list):
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel("gemini-2.0-flash")
+    cat_list = ", ".join(all_categories.keys())
     prompt = f"""Extract ALL transactions from this bank statement text.
 Return ONLY a JSON array. Each object must have exactly these keys:
 "date" (string), "name" (string), "amount" (number, negative=debit positive=credit),
-"category" (one of: Food & Dining, Transport, Shopping, Entertainment, Health,
-Utilities, Travel, Subscriptions, Income, Unknown).
+"category" (one of: {cat_list}).
+If category is unclear use "Unknown".
 
 Bank statement text:
 {text}
 """
     response = model.generate_content(
         prompt,
-        generation_config={"response_mime_type":"application/json"}
+        generation_config={"response_mime_type": "application/json"}
     )
     raw = response.text.strip()
-    # Strip markdown fences if present
     if raw.startswith("```"):
         raw = "\n".join(raw.split("\n")[1:-1])
-    return json.loads(raw)
+    transactions = json.loads(raw)
+    # Apply vendor rules on top of AI categorization
+    for t in transactions:
+        matched = apply_vendor_rules(vendor_rules, t.get("name", ""))
+        if matched:
+            t["category"] = matched
+    return transactions
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -567,7 +574,11 @@ elif st.session_state.step == 3:
                 if not text:
                     st.error("No text could be extracted from the PDF. It may be a scanned image.")
                     st.stop()
-                data = categorize_with_gemini(text)
+                user     = get_user()
+                uid      = user.id if hasattr(user,"id") else user.get("id") if user else None
+                all_cats = load_categories(uid) if uid else DEFAULT_CATEGORY_COLORS
+                v_rules  = load_vendor_rules(uid) if uid else []
+                data = categorize_with_gemini(text, all_cats, v_rules)
                 st.session_state.transactions = data
                 st.session_state.categorized = True
             except Exception as e:
@@ -732,9 +743,15 @@ elif st.session_state.step == 3:
                         },
                     )
 
-        # ── Transaction table ────────────────────────────────────────────────
+        # ── Transaction table ─────────────────────────────────────────────────
         st.markdown("#### All Transactions")
-        categories = list(CATEGORY_COLORS.keys())
+
+        user     = get_user()
+        uid      = user.id if hasattr(user,"id") else user.get("id") if user else None
+        all_cats = load_categories(uid) if uid else DEFAULT_CATEGORY_COLORS
+        v_rules  = load_vendor_rules(uid) if uid else []
+        cat_names = list(all_cats.keys())
+
         df_display = df.copy()
         df_display["amount"] = df_display["amount"].map(lambda x: f"${x:+,.2f}")
 
@@ -742,16 +759,135 @@ elif st.session_state.step == 3:
             df_display,
             column_config={
                 "category": st.column_config.SelectboxColumn(
-                    "Category", options=categories, required=True
+                    "Category", options=cat_names, required=True
                 ),
                 "amount": st.column_config.TextColumn("Amount"),
                 "date":   st.column_config.TextColumn("Date"),
                 "name":   st.column_config.TextColumn("Merchant"),
             },
+            num_rows="dynamic",
             use_container_width=True,
             hide_index=True,
             key="tx_editor",
         )
+
+        # ── Manage categories ─────────────────────────────────────────────────
+        with st.expander("⚙️ Manage categories"):
+            st.markdown("**Add a custom category**")
+            mc1, mc2, mc3 = st.columns([3, 2, 1])
+            with mc1:
+                new_cat_name = st.text_input("Name", placeholder="e.g. Pet Care",
+                                             label_visibility="collapsed", key="new_cat_name")
+            with mc2:
+                new_cat_color = st.color_picker("Colour", value="#a78bfa",
+                                                label_visibility="collapsed", key="new_cat_color")
+            with mc3:
+                if st.button("Add", use_container_width=True, key="add_cat"):
+                    name = new_cat_name.strip()
+                    if not name:
+                        st.warning("Enter a name.")
+                    elif not uid:
+                        st.warning("Sign in to save categories.")
+                    else:
+                        ok, err = save_category(uid, name, new_cat_color)
+                        if ok:
+                            st.success(f"'{name}' saved!")
+                            st.rerun()
+                        else:
+                            st.error(f"Could not save: {err}")
+
+            # List custom (non-default) categories with delete option
+            custom = {k: v for k, v in all_cats.items() if k not in DEFAULT_CATEGORY_COLORS}
+            if custom:
+                st.markdown("**Your custom categories**")
+                for cname, ccolor in custom.items():
+                    cc1, cc2 = st.columns([4, 1])
+                    with cc1:
+                        st.markdown(
+                            f'<span style="display:inline-block;width:12px;height:12px;'
+                            f'border-radius:50%;background:{ccolor};margin-right:8px;'
+                            f'vertical-align:middle"></span>{cname}',
+                            unsafe_allow_html=True,
+                        )
+                    with cc2:
+                        if st.button("✕", key=f"del_cat_{cname}"):
+                            delete_category(uid, cname)
+                            st.rerun()
+
+        # ── Manage vendor rules ───────────────────────────────────────────────
+        with st.expander("🏪 Vendor auto-categorization rules"):
+            st.caption("When the app sees a vendor name matching your rule, it applies your category automatically.")
+            vr1, vr2, vr3, vr4 = st.columns([3, 2, 2, 1])
+            with vr1:
+                new_vr_vendor = st.text_input("Vendor", placeholder="e.g. AMPOL",
+                                              label_visibility="collapsed", key="new_vr_vendor")
+            with vr2:
+                new_vr_cat = st.selectbox("Category", cat_names,
+                                          label_visibility="collapsed", key="new_vr_cat")
+            with vr3:
+                new_vr_type = st.selectbox("Match type", ["contains", "exact"],
+                                           label_visibility="collapsed", key="new_vr_type")
+            with vr4:
+                if st.button("Add", use_container_width=True, key="add_vr"):
+                    vendor = new_vr_vendor.strip()
+                    if not vendor:
+                        st.warning("Enter a vendor name.")
+                    elif not uid:
+                        st.warning("Sign in to save rules.")
+                    else:
+                        ok, err = save_vendor_rule(uid, vendor, new_vr_cat, new_vr_type)
+                        if ok:
+                            st.success(f"Rule saved: {vendor} → {new_vr_cat}")
+                            st.rerun()
+                        else:
+                            st.error(f"Could not save: {err}")
+
+            if v_rules:
+                st.markdown("**Active rules**")
+                for rule in v_rules:
+                    rc1, rc2 = st.columns([5, 1])
+                    with rc1:
+                        st.markdown(
+                            f'`{rule["vendor_name"]}` ({rule["match_type"]}) → '
+                            f'**{rule["category"]}**'
+                        )
+                    with rc2:
+                        if st.button("✕", key=f"del_vr_{rule['vendor_name']}"):
+                            delete_vendor_rule(uid, rule["vendor_name"])
+                            st.rerun()
+
+        # ── Save report ───────────────────────────────────────────────────────
+        with st.expander("💾 Save this report to your account"):
+            if not uid:
+                st.info("Sign in to save reports.")
+            else:
+                sr1, sr2, sr3 = st.columns([3, 2, 2])
+                with sr1:
+                    report_label = st.text_input("Label", placeholder="e.g. March 2026",
+                                                 label_visibility="collapsed", key="report_label")
+                with sr2:
+                    period_start = st.date_input("Period start", value=None,
+                                                 label_visibility="collapsed", key="period_start")
+                with sr3:
+                    period_end = st.date_input("Period end", value=None,
+                                               label_visibility="collapsed", key="period_end")
+                if st.button("💾 Save report", type="primary", use_container_width=True):
+                    if not report_label.strip():
+                        st.warning("Enter a label for this report.")
+                    else:
+                        # Convert df_edited to list of dicts for saving
+                        save_data = df_edited[["date","name","amount","category"]].to_dict("records")
+                        ok, err = save_report(
+                            uid,
+                            report_label.strip(),
+                            str(period_start) if period_start else None,
+                            str(period_end)   if period_end   else None,
+                            save_data,
+                        )
+                        if ok:
+                            st.success("✅ Report saved!")
+                        else:
+                            st.error(f"Could not save: {err}")
 
         # ── Downloads ─────────────────────────────────────────────────────────
         st.markdown("---")
