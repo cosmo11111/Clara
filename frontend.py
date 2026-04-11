@@ -651,20 +651,16 @@ elif st.session_state.step == 3:
             try: return float(s)
             except ValueError: return 0.0
 
-        # Build df_edited from tx_rows, with widget state overlaid.
-        # This means category changes and typed edits show in charts immediately.
+        # Build df_edited from tx_rows overlaid with current widget state.
+        # Widget state is the live truth for typed fields; tx_rows is the
+        # structural truth (which rows exist after add/delete).
         _rows_now = list(st.session_state.get("tx_rows",
                     df[["date","name","amount","category"]].to_dict("records")))
-        # Overlay any widget state that exists (from previous render)
         for _i, _r in enumerate(_rows_now):
-            if f"td_{_i}_date" in st.session_state:
-                _r["date"]     = st.session_state[f"td_{_i}_date"]
-            if f"td_{_i}_name" in st.session_state:
-                _r["name"]     = st.session_state[f"td_{_i}_name"]
-            if f"td_{_i}_amt" in st.session_state:
-                _r["amount"]   = st.session_state[f"td_{_i}_amt"]
-            if f"td_{_i}_cat" in st.session_state:
-                _r["category"] = st.session_state[f"td_{_i}_cat"]
+            _r["date"]     = st.session_state.get(f"td_{_i}_date",     _r.get("date",""))
+            _r["name"]     = st.session_state.get(f"td_{_i}_name",     _r.get("name",""))
+            _r["amount"]   = st.session_state.get(f"td_{_i}_amt",      _r.get("amount",""))
+            _r["category"] = st.session_state.get(f"td_{_i}_cat",      _r.get("category","Unknown"))
         df_edited = pd.DataFrame(_rows_now) if _rows_now else df[["date","name","amount","category"]].copy()
         df_edited["amount"] = df_edited["amount"].map(parse_amount)
 
@@ -819,13 +815,25 @@ elif st.session_state.step == 3:
         # ── Handle pending actions set by callbacks ──────────────────────────
         if st.session_state.get("_tx_pending_delete") is not None:
             idx = st.session_state.pop("_tx_pending_delete")
-            st.info(f"🐛 DEBUG: deleting idx={idx}, rows before={len(st.session_state.tx_rows)}, "
-                    f"rows={[r.get('name','?') for r in st.session_state.tx_rows]}")
-            if 0 <= idx < len(st.session_state.tx_rows):
-                st.session_state.tx_rows.pop(idx)
-            st.info(f"🐛 DEBUG: rows after={len(st.session_state.tx_rows)}")
-            for k in [k for k in st.session_state if k.startswith("td_")]:
-                del st.session_state[k]
+            rows_before = st.session_state.tx_rows
+            n = len(rows_before)
+            if 0 <= idx < n:
+                rows_before.pop(idx)
+                # Shift all widget state keys above idx down by one
+                # so the cached values stay aligned with the new row indices.
+                # Process from idx upward, copying idx+1 → idx, idx+2 → idx+1 etc.
+                fields = ("date", "name", "amt", "cat", "del")
+                for j in range(idx, n - 1):
+                    for f in fields:
+                        src = f"td_{j+1}_{f}"
+                        dst = f"td_{j}_{f}"
+                        if src in st.session_state:
+                            st.session_state[dst] = st.session_state[src]
+                        elif dst in st.session_state:
+                            del st.session_state[dst]
+                # Remove the last set of keys (now stale after shift)
+                for f in fields:
+                    st.session_state.pop(f"td_{n-1}_{f}", None)
             st.rerun()
 
         if st.session_state.get("_tx_pending_add"):
@@ -844,14 +852,6 @@ elif st.session_state.step == 3:
         rows = st.session_state.tx_rows
         vendor_rule_queue = []
         new_cats_needed   = []
-
-        # ── Debug: show current tx_rows state ────────────────────────────────
-        with st.expander("🐛 DEBUG — tx_rows state", expanded=True):
-            st.write(f"Total rows: {len(rows)}")
-            for _di, _dr in enumerate(rows):
-                st.write(f"  [{_di}] {_dr.get('name','?')} | {_dr.get('amount','?')} | {_dr.get('category','?')}")
-            td_keys = {k: v for k, v in st.session_state.items() if k.startswith("td_")}
-            st.write(f"td_ widget keys: {list(td_keys.keys())}")
 
         # ── Render each row ───────────────────────────────────────────────────
         # IMPORTANT: we do NOT write widget values back to rows[] during render.
