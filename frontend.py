@@ -367,6 +367,8 @@ with st.sidebar:
         email = user.email if hasattr(user, "email") else user.get("email", "")
         st.markdown(f"<p style='color:#888;font-size:.8rem;margin-bottom:4px'>Signed in as</p>", unsafe_allow_html=True)
         st.markdown(f"<p style='color:#e8e6e1;font-size:.85rem;font-weight:500;word-break:break-all'>{email}</p>", unsafe_allow_html=True)
+        if st.button("📂 Saved Reports", use_container_width=True):
+            st.switch_page("pages/4_reports.py")
         if st.button("Sign out", use_container_width=True):
             try:
                 get_supabase().auth.sign_out()
