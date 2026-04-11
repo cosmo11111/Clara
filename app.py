@@ -7,6 +7,7 @@ import json
 import plotly.graph_objects as go
 import google.generativeai as genai
 import pandas as pd
+from auth import require_auth, get_user, clear_session, get_supabase
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Expense Categorizer", page_icon="💳", layout="wide")
@@ -303,6 +304,25 @@ with st.sidebar:
         zoom = st.session_state.zoom
 
 # ── Header ────────────────────────────────────────────────────────────────────
+# ── Auth guard ───────────────────────────────────────────────────────────────
+require_auth()
+
+# ── User menu in sidebar ──────────────────────────────────────────────────────
+user = get_user()
+with st.sidebar:
+    st.markdown("---")
+    if user:
+        email = user.email if hasattr(user, "email") else user.get("email", "")
+        st.markdown(f"<p style='color:#888;font-size:.8rem;margin-bottom:4px'>Signed in as</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:#e8e6e1;font-size:.85rem;font-weight:500;word-break:break-all'>{email}</p>", unsafe_allow_html=True)
+        if st.button("Sign out", use_container_width=True):
+            try:
+                get_supabase().auth.sign_out()
+            except Exception:
+                pass
+            clear_session()
+            st.switch_page("pages/1_login.py")
+
 st.markdown("# 💳 Expense Categorizer")
 st.markdown("*AI-powered bank statement analysis with privacy-first redaction*")
 st.markdown("---")
