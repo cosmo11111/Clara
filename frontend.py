@@ -384,6 +384,8 @@ st.markdown("---")
 # ═══════════════════════════════════════════════════════════
 # STEP 1 + 2 — Upload & Redact (single combined page)
 # ═══════════════════════════════════════════════════════════
+st.write(list(st.secrets.keys()))
+
 if st.session_state.step in (1, 2):
 
     pdf_loaded = st.session_state.pdf_bytes is not None
