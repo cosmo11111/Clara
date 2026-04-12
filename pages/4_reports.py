@@ -14,10 +14,6 @@ section[data-testid="stSidebar"] * { color:#c9c7c0 !important; }
 #MainMenu { visibility:hidden; } footer { visibility:hidden; }
 .stButton button { border-radius:8px !important; font-weight:500 !important; transition:all .15s !important; }
 .stButton button[kind="primary"] { background:#f0c040 !important; color:#0f0f13 !important; border:none !important; }
-/* Make delete buttons look danger-ish */
-div[data-testid="stHorizontalBlock"] .stButton button {
-    font-size:12px !important; padding:4px 12px !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -47,6 +43,15 @@ if not uid:
     st.warning("Please sign in to view saved reports.")
     st.stop()
 
+# ── Handle delete via query params ─────────────────────────────────────────────
+qp = st.query_params
+if "delete_report" in qp:
+    rid_to_delete = qp["delete_report"]
+    st.query_params.clear()
+    ok, err = delete_report(rid_to_delete)
+    st.toast("Report deleted" if ok else f"Error: {err}", icon="🗑️" if ok else "⚠️")
+    st.rerun()
+
 reports = load_reports(uid)
 
 col_title, col_btn = st.columns([4, 1])
@@ -65,7 +70,8 @@ if not reports:
     <div style="text-align:center;padding:4rem 1rem">
         <div style="font-size:2.5rem;margin-bottom:16px">📂</div>
         <p style="font-size:1.1rem;color:#e8e6e1;margin-bottom:8px">No saved reports yet</p>
-        <p style="color:#666;font-size:.9rem">Upload a bank statement, categorize your expenses,<br>then save the report from Step 3.</p>
+        <p style="color:#666;font-size:.9rem">Upload a bank statement, categorize your expenses,<br>
+        then save the report from Step 3.</p>
     </div>
     """, unsafe_allow_html=True)
     st.stop()
@@ -78,24 +84,22 @@ def cat_pill(cat):
             f'font-size:11px;background:{color}22;color:{color};border:1px solid {color}44">'
             f'{cat}</span>')
 
-def format_amount(v):
+def fmt(v):
     sign = "−" if v < 0 else "+"
     return f"{sign}${abs(v):,.2f}"
 
-def amount_color(v):
+def acol(v):
     return "#f87171" if v < 0 else "#34d399"
 
-# ── Handle pending delete from callback ────────────────────────────────────────
-if "pending_delete_report" in st.session_state:
-    rid_to_delete = st.session_state.pop("pending_delete_report")
-    ok, err = delete_report(rid_to_delete)
-    if ok:
-        st.toast("Report deleted", icon="🗑️")
-    else:
-        st.toast(f"Could not delete: {err}", icon="⚠️")
-    st.rerun()
+# ── Render all reports as one big HTML block ───────────────────────────────────
+# Rendering everything in a single components.html call means:
+# - One fixed height we can calculate accurately upfront
+# - No iframe-to-parent communication needed for expand/collapse
+# - Delete uses window.parent.location which reliably triggers Streamlit rerun
 
-# ── Render each report ─────────────────────────────────────────────────────────
+all_cards_html = ""
+total_height   = 0
+
 for report in reports:
     rid          = report["id"]
     label        = report["label"]
@@ -117,58 +121,32 @@ for report in reports:
     items = load_report_items(rid)
     n_tx  = len(items)
 
-    # Build transaction rows HTML
     tx_rows_html = ""
     for item in items:
         vendor  = item.get("vendor_name") or ""
         is_red  = item.get("is_redacted", False)
         amt     = float(item.get("amount") or 0)
-        cat     = item.get("category","Unknown")
-        date    = item.get("date","")
+        cat     = item.get("category", "Unknown")
+        date    = item.get("date", "")
         vendor_cell = (
             '<span style="color:#444;font-style:italic">⬛ redacted</span>'
             if is_red else vendor
         )
         tx_rows_html += f"""<tr>
-            <td>{date}</td>
-            <td>{vendor_cell}</td>
-            <td style="color:{amount_color(amt)};font-family:\'DM Mono\',monospace">{format_amount(amt)}</td>
-            <td>{cat_pill(cat)}</td>
+          <td class="td">{date}</td>
+          <td class="td">{vendor_cell}</td>
+          <td class="td" style="color:{acol(amt)};font-family:'DM Mono',monospace">{fmt(amt)}</td>
+          <td class="td">{cat_pill(cat)}</td>
         </tr>"""
 
-    # ── Self-contained card HTML (no parent communication needed) ─────────────
-    # The card starts COLLAPSED (header only = 70px).
-    # JS toggles an internal open/close; we measure content height after open
-    # and resize the iframe via postMessage so Streamlit expands it.
-    card_html = f"""<!DOCTYPE html><html><head>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{font-family:'DM Sans',sans-serif;background:transparent;overflow:hidden}}
-.card{{background:#1a1a24;border:1px solid #2a2a38;border-radius:12px;overflow:hidden}}
-.hdr{{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;cursor:pointer;user-select:none;transition:background .15s}}
-.hdr:hover{{background:#1e1e2e}}
-.lbl{{font-size:15px;font-weight:500;color:#e8e6e1}}
-.meta{{font-size:12px;color:#555;margin-top:3px}}
-.stats{{display:flex;gap:24px;align-items:center}}
-.stat{{text-align:right}}
-.sv{{font-size:14px;font-weight:500;font-family:'DM Mono',monospace}}
-.sl{{font-size:10px;color:#555;margin-top:1px;text-transform:uppercase;letter-spacing:.04em}}
-.chev{{color:#555;margin-left:14px;font-size:11px;transition:transform .2s;display:inline-block}}
-.chev.open{{transform:rotate(180deg)}}
-.body{{display:none;border-top:1px solid #1e1e28;padding:16px 20px}}
-.mgs{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}}
-.mp{{background:#0f0f13;border-radius:8px;padding:10px 12px}}
-.mv{{font-size:15px;font-weight:500;font-family:'DM Mono',monospace}}
-.ml{{font-size:10px;color:#555;margin-top:3px;text-transform:uppercase;letter-spacing:.04em}}
-table{{width:100%;border-collapse:collapse;font-size:13px}}
-th{{color:#555;font-weight:400;text-align:left;padding:6px 8px;border-bottom:1px solid #2a2a38;font-size:10px;text-transform:uppercase;letter-spacing:.06em}}
-td{{padding:7px 8px;border-bottom:1px solid #1e1e28;color:#e8e6e1}}
-tr:last-child td{{border-bottom:none}}
-</style>
-</head><body>
-<div class="card" id="card">
-  <div class="hdr" onclick="toggle()">
+    # Card height: header=72, metric grid=100, table header=32, rows=38each, actions=52, padding=32
+    card_collapsed_h = 76
+    card_expanded_h  = card_collapsed_h + 100 + 32 + (n_tx * 38) + 52 + 32
+    total_height    += card_collapsed_h + 12  # start collapsed + gap
+
+    all_cards_html += f"""
+<div class="card" id="card-{rid}">
+  <div class="hdr" onclick="toggle('{rid}', {card_expanded_h})">
     <div>
       <div class="lbl">{label}</div>
       <div class="meta">{period_str}saved {created_at}</div>
@@ -188,10 +166,11 @@ tr:last-child td{{border-bottom:none}}
           <div class="sl">transactions</div>
         </div>
       </div>
-      <span class="chev" id="chev">▼</span>
+      <span class="chev" id="chev-{rid}">▼</span>
     </div>
   </div>
-  <div class="body" id="body">
+
+  <div class="body" id="body-{rid}">
     <div class="mgs">
       <div class="mp"><div class="mv" style="color:#f87171">${abs(total_spend):,.2f}</div><div class="ml">Total spent</div></div>
       <div class="mp"><div class="mv" style="color:#34d399">${total_income:,.2f}</div><div class="ml">Income</div></div>
@@ -199,42 +178,100 @@ tr:last-child td{{border-bottom:none}}
       <div class="mp"><div class="mv" style="color:#e8e6e1">{n_tx}</div><div class="ml">Transactions</div></div>
     </div>
     <table>
-      <thead><tr><th style="width:12%">Date</th><th style="width:36%">Merchant</th><th style="width:15%">Amount</th><th>Category</th></tr></thead>
+      <thead><tr>
+        <th style="width:12%">Date</th>
+        <th style="width:36%">Merchant</th>
+        <th style="width:15%">Amount</th>
+        <th>Category</th>
+      </tr></thead>
       <tbody>{tx_rows_html}</tbody>
     </table>
+    <div class="actions">
+      <button class="del-btn" onclick="delReport('{rid}')">🗑 Delete report</button>
+    </div>
   </div>
 </div>
+<div style="height:10px"></div>
+"""
+
+page_html = f"""<!DOCTYPE html><html><head>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:'DM Sans',sans-serif;background:transparent}}
+.card{{background:#1a1a24;border:1px solid #2a2a38;border-radius:12px;overflow:hidden;
+       transition:all .2s}}
+.hdr{{display:flex;justify-content:space-between;align-items:center;
+      padding:16px 20px;cursor:pointer;user-select:none;min-height:72px;transition:background .15s}}
+.hdr:hover{{background:#1e1e2e}}
+.lbl{{font-size:15px;font-weight:500;color:#e8e6e1}}
+.meta{{font-size:12px;color:#555;margin-top:3px}}
+.stats{{display:flex;gap:24px;align-items:center}}
+.stat{{text-align:right}}
+.sv{{font-size:14px;font-weight:500;font-family:'DM Mono',monospace}}
+.sl{{font-size:10px;color:#555;margin-top:1px;text-transform:uppercase;letter-spacing:.04em}}
+.chev{{color:#555;margin-left:14px;font-size:11px;transition:transform .25s;display:inline-block}}
+.chev.open{{transform:rotate(180deg)}}
+.body{{display:none;border-top:1px solid #1e1e28;padding:16px 20px}}
+.body.open{{display:block}}
+.mgs{{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}}
+.mp{{background:#0f0f13;border-radius:8px;padding:10px 12px}}
+.mv{{font-size:15px;font-weight:500;font-family:'DM Mono',monospace}}
+.ml{{font-size:10px;color:#555;margin-top:3px;text-transform:uppercase;letter-spacing:.04em}}
+table{{width:100%;border-collapse:collapse;font-size:13px}}
+th{{color:#555;font-weight:400;text-align:left;padding:6px 8px;
+    border-bottom:1px solid #2a2a38;font-size:10px;text-transform:uppercase;letter-spacing:.06em}}
+.td{{padding:7px 8px;border-bottom:1px solid #1e1e28;color:#e8e6e1}}
+tr:last-child .td{{border-bottom:none}}
+.actions{{display:flex;gap:8px;margin-top:14px}}
+.del-btn{{background:transparent;border:1px solid #2a2a38;border-radius:8px;
+          color:#666;font-size:12px;padding:6px 14px;cursor:pointer;
+          font-family:'DM Sans',sans-serif;transition:all .15s}}
+.del-btn:hover{{border-color:#f87171;color:#f87171;background:#1f0f0f}}
+</style>
+</head><body>
+{all_cards_html}
 <script>
-var open = false;
-function toggle() {{
-  open = !open;
-  document.getElementById('body').style.display = open ? 'block' : 'none';
-  document.getElementById('chev').classList.toggle('open', open);
-  // Tell Streamlit the new height needed
-  var h = document.getElementById('card').scrollHeight + 4;
-  window.parent.postMessage({{type:'streamlit:setFrameHeight', height: h}}, '*');
+var heights = {{}};
+
+function toggle(id, expandedH) {{
+  var body = document.getElementById('body-' + id);
+  var chev = document.getElementById('chev-' + id);
+  var card = document.getElementById('card-' + id);
+  var isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  chev.classList.toggle('open', !isOpen);
+  heights[id] = !isOpen;
+  updateFrameHeight();
 }}
-// Start at collapsed header height
-window.parent.postMessage({{type:'streamlit:setFrameHeight', height: 72}}, '*');
+
+function updateFrameHeight() {{
+  var total = 0;
+  document.querySelectorAll('.card').forEach(function(card) {{
+    total += card.scrollHeight + 10;
+  }});
+  window.parent.postMessage({{
+    isStreamlitMessage: true,
+    type: 'streamlit:setFrameHeight',
+    height: total + 20
+  }}, '*');
+}}
+
+function delReport(id) {{
+  if (confirm('Delete this report? This cannot be undone.')) {{
+    var url = new URL(window.parent.location.href);
+    url.searchParams.set('delete_report', id);
+    window.parent.location.href = url.toString();
+  }}
+}}
+
+// Set initial height after render
+window.addEventListener('load', function() {{
+  updateFrameHeight();
+}});
 </script>
 </body></html>"""
 
-    # Render card — start collapsed at 72px, JS expands via setFrameHeight
-    components.html(card_html, height=72, scrolling=False)
-
-    # ── Delete button rendered natively in Streamlit (reliable) ───────────────
-    _, del_col = st.columns([5, 1])
-    with del_col:
-        def _make_delete_cb(report_id):
-            def _cb():
-                st.session_state.pending_delete_report = report_id
-            return _cb
-
-        st.button(
-            "🗑 Delete",
-            key=f"del_report_{rid}",
-            on_click=_make_delete_cb(rid),
-            use_container_width=True,
-        )
-
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+# Render everything in ONE iframe — height starts at collapsed total
+# JS will adjust after any toggle
+components.html(page_html, height=total_height + 40, scrolling=True)
