@@ -61,7 +61,7 @@ if mode == "request":
 
                     # Use the full Streamlit page path as redirect
                     # Supabase will append ?code=... to this URL
-                    redirect = f"{app}/3_reset_password"
+                    redirect = f"{app}/reset_password"
 
                     sb.auth.reset_password_email(
                         email.strip(),
@@ -100,13 +100,19 @@ else:
     _, col, _ = st.columns([1, 2, 1])
     with col:
         msg_placeholder = st.empty()
+        email        = st.text_input("Email address", placeholder="you@example.com")
         new_password = st.text_input("New password", type="password",
                                      placeholder="At least 8 characters")
         confirm      = st.text_input("Confirm password", type="password",
                                      placeholder="••••••••")
 
         if st.button("Update password", type="primary"):
-            if len(new_password) < 8:
+            if not email.strip():
+                msg_placeholder.markdown(
+                    '<div class="auth-error">Please enter your email address.</div>',
+                    unsafe_allow_html=True,
+                )
+            elif len(new_password) < 8:
                 msg_placeholder.markdown(
                     '<div class="auth-error">Password must be at least 8 characters.</div>',
                     unsafe_allow_html=True,
@@ -118,26 +124,17 @@ else:
                 )
             else:
                 try:
-                    sb = get_supabase()
+                    sb    = get_supabase()
+                    token = params["token"]
 
-                    if has_code:
-                        # PKCE flow — exchange code for session
-                        code = params["code"]
-                        st.info(f"🐛 Attempting PKCE exchange with code: {str(code)[:20]}...")
-                        res = sb.auth.exchange_code_for_session({"auth_code": code})
-                        st.info(f"🐛 Exchange result: {res}")
-                    elif has_token:
-                        # Legacy token flow
-                        token = params["token"]
-                        st.info(f"🐛 Attempting token verification: {str(token)[:20]}...")
-                        res = sb.auth.verify_otp({
-                            "token": token,
-                            "type":  "recovery",
-                            "email": params.get("email", ""),
-                        })
-                        st.info(f"🐛 Verify result: {res}")
+                    st.info(f"🐛 Verifying token for {email.strip()}...")
+                    res = sb.auth.verify_otp({
+                        "email": email.strip(),
+                        "token": token,
+                        "type":  "recovery",
+                    })
+                    st.info(f"🐛 Verify OK, updating password...")
 
-                    # Update the password
                     sb.auth.update_user({"password": new_password})
 
                     msg_placeholder.markdown(
