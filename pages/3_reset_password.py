@@ -7,16 +7,33 @@ st.markdown(AUTH_CSS, unsafe_allow_html=True)
 if is_logged_in():
     st.switch_page("frontend.py")
 
-# ── Two modes: request reset OR set new password (arrived via email link) ─────
-# Supabase sends a link like: https://yourapp.com/reset_password#access_token=...
-# Streamlit can't read URL fragments directly, so we show the new-password form
-# whenever the user lands on this page after a reset — the Supabase JS SDK would
-# normally handle this, but in pure Python we check for a token in query params.
-# Supabase can be configured to send PKCE links which append ?code= instead.
 params = st.query_params
 
-mode = "set_new" if "code" in params else "request"
+# ── DEBUG — shows exactly what Supabase sent back ─────────────────────────────
+# Remove this block once password reset is confirmed working
+with st.expander("🐛 Debug info (remove before launch)", expanded=True):
+    st.write("**All query params received:**", dict(params))
+    st.write("**Keys present:**", list(params.keys()))
+    st.write("**'code' present:**", "code" in params)
+    st.write("**'token' present:**", "token" in params)
+    st.write("**'type' present:**", "type" in params)
+    if "code" in params:
+        st.write("**code value (first 20 chars):**", str(params["code"])[:20] + "...")
+    if "type" in params:
+        st.write("**type value:**", params["type"])
+    st.caption("This tells us exactly what Supabase is sending and whether Streamlit is receiving it.")
 
+# ── Detect mode ────────────────────────────────────────────────────────────────
+# Supabase PKCE flow sends ?code=...
+# Supabase magic link sends #access_token=... (fragment — Streamlit can't read)
+# We also check for ?token= and ?type=recovery as fallbacks
+has_code     = "code" in params
+has_token    = "token" in params
+is_recovery  = params.get("type") == "recovery"
+
+mode = "set_new" if (has_code or has_token or is_recovery) else "request"
+
+# ── Request mode — send reset email ───────────────────────────────────────────
 if mode == "request":
     st.markdown("""
     <div class="auth-card">
@@ -39,15 +56,20 @@ if mode == "request":
                 )
             else:
                 try:
-                    sb = get_supabase()
+                    sb  = get_supabase()
+                    app = st.secrets.get("APP_URL", "").rstrip("/")
+
+                    # Use the full Streamlit page path as redirect
+                    # Supabase will append ?code=... to this URL
+                    redirect = f"{app}/3_reset_password"
+
                     sb.auth.reset_password_email(
                         email.strip(),
-                        options={"redirect_to": f"{st.secrets.get('APP_URL', '')}/reset_password"},
+                        options={"redirect_to": redirect},
                     )
-                    # Always show success (prevents email enumeration)
                     msg_placeholder.markdown(
                         '<div class="auth-success">'
-                        '✅ If that email is registered, you\'ll receive a reset link shortly. '
+                        "✅ If that email is registered, you'll receive a reset link shortly. "
                         'Check your spam folder too.'
                         '</div>',
                         unsafe_allow_html=True,
@@ -61,12 +83,12 @@ if mode == "request":
         st.markdown('<hr class="auth-divider">', unsafe_allow_html=True)
         st.markdown(
             '<div class="auth-link">Remembered it? '
-            '<a href="/login" target="_self">Back to sign in</a></div>',
+            '<a href="/1_login" target="_self">Back to sign in</a></div>',
             unsafe_allow_html=True,
         )
 
+# ── Set new password mode — arrived via email link ────────────────────────────
 else:
-    # User arrived via the reset link — exchange code for session, then set new password
     st.markdown("""
     <div class="auth-card">
       <div class="auth-logo">🔑</div>
@@ -97,25 +119,42 @@ else:
             else:
                 try:
                     sb = get_supabase()
-                    # Exchange the PKCE code for a session first
-                    code = params["code"]
-                    sb.auth.exchange_code_for_session({"auth_code": code})
-                    # Now update the password
+
+                    if has_code:
+                        # PKCE flow — exchange code for session
+                        code = params["code"]
+                        st.info(f"🐛 Attempting PKCE exchange with code: {str(code)[:20]}...")
+                        res = sb.auth.exchange_code_for_session({"auth_code": code})
+                        st.info(f"🐛 Exchange result: {res}")
+                    elif has_token:
+                        # Legacy token flow
+                        token = params["token"]
+                        st.info(f"🐛 Attempting token verification: {str(token)[:20]}...")
+                        res = sb.auth.verify_otp({
+                            "token": token,
+                            "type":  "recovery",
+                            "email": params.get("email", ""),
+                        })
+                        st.info(f"🐛 Verify result: {res}")
+
+                    # Update the password
                     sb.auth.update_user({"password": new_password})
+
                     msg_placeholder.markdown(
                         '<div class="auth-success">'
                         '✅ Password updated! '
-                        '<a href="/login" target="_self" style="color:#34d399">Sign in</a>'
+                        '<a href="/1_login" target="_self" style="color:#34d399">Sign in</a>'
                         '</div>',
                         unsafe_allow_html=True,
                     )
-                    # Clear the code from URL
                     st.query_params.clear()
+
                 except Exception as e:
                     msg_placeholder.markdown(
                         f'<div class="auth-error">Could not update password: {e}<br>'
                         'The reset link may have expired — '
-                        '<a href="/reset_password" target="_self" style="color:#f87171">'
+                        '<a href="/3_reset_password" target="_self" style="color:#f87171">'
                         'request a new one</a>.</div>',
                         unsafe_allow_html=True,
                     )
+                    st.write("🐛 Full exception:", str(e))
