@@ -65,3 +65,9 @@ with col:
         '<a href="/signup" target="_self">Sign up free</a></div>',
         unsafe_allow_html=True,
     )
+    st.markdown(
+        '<div class="auth-link" style="margin-top:16px;font-size:.75rem;color:#444">'
+        '<a href="https://drive.google.com/file/d/1Yl0ed8IiMzYalV2rcXUsLtBymnvvjyZ5/view?usp=sharing" target="_blank" style="color:#555">📄 Privacy Policy</a>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
