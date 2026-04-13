@@ -83,3 +83,10 @@ with col:
         '<a href="/login" target="_self">Sign in</a></div>',
         unsafe_allow_html=True,
     )
+    st.markdown(
+        '<div class="auth-link" style="margin-top:12px;font-size:.75rem;color:#444">'
+        'By signing up you agree to our '
+        '<a href="https://drive.google.com/file/d/1Yl0ed8IiMzYalV2rcXUsLtBymnvvjyZ5/view?usp=sharing" target="_blank" style="color:#555">Privacy Policy</a>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
