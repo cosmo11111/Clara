@@ -9,6 +9,7 @@ import google.generativeai as genai
 import pandas as pd
 from auth import require_auth, get_user, clear_session, get_supabase
 from db import (
+    can_analyse, increment_usage, get_profile, TIER_LABELS, TIER_LIMITS,
     load_categories, save_category, delete_category,
     load_vendor_rules, apply_vendor_rules, save_vendor_rule, delete_vendor_rule,
     save_report, load_reports, load_report_items, delete_report,
@@ -367,6 +368,8 @@ with st.sidebar:
         email = user.email if hasattr(user, "email") else user.get("email", "")
         st.markdown(f"<p style='color:#888;font-size:.8rem;margin-bottom:4px'>Signed in as</p>", unsafe_allow_html=True)
         st.markdown(f"<p style='color:#e8e6e1;font-size:.85rem;font-weight:500;word-break:break-all'>{email}</p>", unsafe_allow_html=True)
+        if st.button("⚡ Upgrade plan", use_container_width=True):
+            st.switch_page("pages/5_pricing.py")
         if st.button("📂 Saved Reports", use_container_width=True):
             st.switch_page("pages/4_reports.py")
         if st.button("Sign out", use_container_width=True):
@@ -384,8 +387,6 @@ st.markdown("---")
 # ═══════════════════════════════════════════════════════════
 # STEP 1 + 2 — Upload & Redact (single combined page)
 # ═══════════════════════════════════════════════════════════
-st.write(list(st.secrets.keys()))
-
 if st.session_state.step in (1, 2):
 
     pdf_loaded = st.session_state.pdf_bytes is not None
@@ -617,19 +618,50 @@ elif st.session_state.step == 3:
             st.rerun()
 
     if run:
+        # ── Usage gate ────────────────────────────────────────────────────────
+        user = get_user()
+        uid  = user.id if hasattr(user,"id") else user.get("id") if user else None
+
+        if uid:
+            allowed, reason = can_analyse(uid)
+            if not allowed:
+                st.error(f"🔒 {reason}")
+                profile = get_profile(uid)
+                tier    = profile.get("subscription_tier", "free_trial")
+                used    = profile.get("analyses_used", 0)
+                limit   = profile.get("analyses_limit", 3)
+
+                st.markdown(f"""
+                <div style="background:#1a1a24;border:1px solid #2a2a38;border-radius:12px;
+                            padding:20px 24px;margin:16px 0">
+                  <p style="color:#666;font-size:.85rem;margin:0 0 12px">
+                    Current plan: <b style="color:#e8e6e1">{TIER_LABELS.get(tier,'Free Trial')}</b>
+                    &nbsp;·&nbsp; {used} / {'∞' if tier=='unlimited' else limit} analyses used
+                  </p>
+                  <p style="color:#e8e6e1;font-size:.95rem;margin:0">
+                    Upgrade to keep categorizing your expenses.
+                  </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                if st.button("⚡ View upgrade options", type="primary"):
+                    st.switch_page("pages/5_pricing.py")
+                st.stop()
+
         with st.spinner("Extracting text and sending to Gemini…"):
             try:
                 text = extract_text_all_pages(st.session_state.redacted_pdf_bytes)
                 if not text:
                     st.error("No text could be extracted from the PDF. It may be a scanned image.")
                     st.stop()
-                user     = get_user()
-                uid      = user.id if hasattr(user,"id") else user.get("id") if user else None
                 all_cats = load_categories(uid) if uid else DEFAULT_CATEGORY_COLORS
                 v_rules  = load_vendor_rules(uid) if uid else []
                 data = categorize_with_gemini(text, all_cats, v_rules)
                 st.session_state.transactions = data
                 st.session_state.categorized = True
+                # Increment usage counter after successful analysis
+                if uid:
+                    increment_usage(uid)
             except Exception as e:
                 st.error(f"Gemini error: {e}")
                 st.stop()
