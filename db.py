@@ -245,3 +245,135 @@ def delete_report(report_id: str) -> tuple[bool, str]:
         return True, ""
     except Exception as e:
         return False, str(e)
+
+
+# ── Subscription / usage functions ─────────────────────────────────────────────
+
+TIER_LIMITS = {
+    "free_trial": 3,    # lifetime
+    "starter":    10,   # per month
+    "unlimited":  None, # no limit
+}
+
+TIER_PRICES = {
+    "free_trial": 0,
+    "starter":    9,
+    "unlimited":  29,
+}
+
+TIER_LABELS = {
+    "free_trial": "Free Trial",
+    "starter":    "Starter",
+    "unlimited":  "Unlimited",
+}
+
+
+def get_profile(uid: str) -> dict:
+    """Fetch the user's profile row (subscription tier, usage etc.)."""
+    try:
+        sb  = get_supabase()
+        res = sb.table("profiles").select("*").eq("id", uid).single().execute()
+        return res.data or {}
+    except Exception:
+        return {}
+
+
+def can_analyse(uid: str) -> tuple[bool, str]:
+    """
+    Check if the user is allowed to run an analysis.
+    Returns (True, "") or (False, reason_string).
+    """
+    profile = get_profile(uid)
+    if not profile:
+        return False, "Profile not found. Please sign out and back in."
+
+    tier  = profile.get("subscription_tier", "free_trial")
+    used  = profile.get("analyses_used", 0)
+    limit = profile.get("analyses_limit", 3)
+
+    if tier == "unlimited":
+        return True, ""
+
+    if tier == "free_trial":
+        if used >= 3:
+            return False, (
+                f"You've used all 3 free analyses. "
+                f"Upgrade to Starter ($9/mo) for 10 analyses/month "
+                f"or Unlimited ($29/mo) for unlimited access."
+            )
+        return True, ""
+
+    if tier == "starter":
+        if used >= limit:
+            return False, (
+                f"You've used all {limit} analyses this month. "
+                f"Upgrade to Unlimited ($29/mo) for unlimited access, "
+                f"or wait until your plan resets next month."
+            )
+        return True, ""
+
+    return False, "Unknown subscription tier."
+
+
+def increment_usage(uid: str) -> bool:
+    """Increment analyses_used by 1 after a successful analysis."""
+    try:
+        sb      = get_supabase()
+        profile = get_profile(uid)
+        used    = profile.get("analyses_used", 0)
+        sb.table("profiles") \
+          .update({"analyses_used": used + 1, "updated_at": "now()"}) \
+          .eq("id", uid) \
+          .execute()
+        return True
+    except Exception:
+        return False
+
+
+def upgrade_user(uid: str, tier: str,
+                 stripe_customer_id: str = None,
+                 stripe_sub_id: str = None,
+                 period_start=None,
+                 period_end=None) -> tuple[bool, str]:
+    """
+    Update a user's subscription tier after successful Stripe payment.
+    Called by the webhook handler.
+    """
+    try:
+        sb      = get_supabase()
+        updates = {
+            "subscription_tier": tier,
+            "analyses_used":     0,
+            "analyses_limit":    TIER_LIMITS.get(tier, 10) or 10,
+            "updated_at":        "now()",
+        }
+        if stripe_customer_id:
+            updates["stripe_customer_id"] = stripe_customer_id
+        if stripe_sub_id:
+            updates["stripe_sub_id"] = stripe_sub_id
+        if period_start:
+            updates["sub_period_start"] = period_start
+        if period_end:
+            updates["sub_period_end"] = period_end
+
+        sb.table("profiles").update(updates).eq("id", uid).execute()
+        return True, ""
+    except Exception as e:
+        return False, str(e)
+
+
+def downgrade_user(uid: str) -> tuple[bool, str]:
+    """Downgrade user to free_trial when subscription is cancelled/expired."""
+    try:
+        sb = get_supabase()
+        sb.table("profiles").update({
+            "subscription_tier":  "free_trial",
+            "analyses_limit":     3,
+            "stripe_sub_id":      None,
+            "sub_period_start":   None,
+            "sub_period_end":     None,
+            "updated_at":         "now()",
+        }).eq("id", uid).execute()
+        return True, ""
+    except Exception as e:
+        return False, str(e)
