@@ -53,6 +53,11 @@ st.markdown("""
   [data-testid="stHeader"] { display: none !important; }
   /* Remove the gap the header leaves behind */
   .block-container { padding-top: 1rem !important; }
+  /* Remove sidebar top decoration and collapse button */
+  [data-testid="stSidebarHeader"] { display: none !important; }
+  [data-testid="collapsedControl"] { display: none !important; }
+  /* Remove gap at top of sidebar content */
+  section[data-testid="stSidebar"] > div { padding-top: 1rem !important; }
 
   /* Sidebar */
   section[data-testid="stSidebar"] { background: #17171d !important; border-right: 1px solid #2a2a35; }
@@ -379,7 +384,8 @@ with st.sidebar:
         st.rerun()
 
     # Middle: Step progress — pushed down 20% with top padding
-    st.markdown("<div style='padding-top:20vh'>", unsafe_allow_html=True)
+    # Bottom padding ensures it never overlaps the pinned user menu
+    st.markdown("<div style='padding-top:20vh;padding-bottom:220px'>", unsafe_allow_html=True)
     steps = [
         (1, "Upload statement"),
         (2, "Redact private info"),
