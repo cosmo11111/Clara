@@ -367,7 +367,7 @@ Bank statement text:
 """
     response = model.generate_content(
         prompt,
-        generation_config={{"response_mime_type": "application/json"}}
+        generation_config={"response_mime_type": "application/json"}
     )
     raw = response.text.strip()
     if raw.startswith("```"):
