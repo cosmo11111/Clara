@@ -655,27 +655,15 @@ if st.session_state.step in (1, 2):
             st.markdown("### How it works")
             st.markdown("""<div class="card">
                 <h3>🔒 Privacy first</h3>
-                <p>Your bank statement never leaves your control. Before the AI reads anything,
-                you can drag to select and black out sensitive details — account numbers, BSBs,
-                card numbers, names, addresses, or anything else you'd rather keep private.
-                Redacted areas are permanently removed from the document the AI receives.
-                We don't store your PDF at any point.</p>
+                <p>Before the AI reads anything, you can black out sensitive details such as account numbers, BSBs, names, addresses, or anything else you'd rather keep private. Redacted areas are permanently removed from the document the AI receives. We don't store your PDF at any point.</p>
             </div>
             <div class="card">
                 <h3>🤖 AI categorization</h3>
-                <p>Once you're happy with the redactions, our AI reads every transaction across
-                all pages of your statement and assigns each one a spending category —
-                Food & Dining, Transport, Subscriptions, Shopping, and more.
-                You can edit any categorization, add your own custom categories, and set
-                vendor rules so your regular merchants are always categorized correctly
-                in future uploads.</p>
+                <p>Our AI then categorizes each transaction within your statement. You can add your own custom categories, edit any categorization,  and set vendor rules so your regular merchants are always categorized correctly in future uploads.</p>
             </div>
             <div class="card">
                 <h3>📊 Instant insights</h3>
-                <p>See your spending broken down by category in a donut chart, with a full
-                transaction table below. Check your top vendors by total spend or number
-                of charges. Add or remove transactions manually, then save the report
-                to your account — so you can come back and compare month over month.</p>
+                <p>See a top level view of your spending and also review the detailed list of your transactions. Add or remove transactions manually, then save the report to your account so you can come back and compare month over month.</p>
             </div>""", unsafe_allow_html=True)
 
     # File uploader still needed when PDF is loaded (hidden label)
