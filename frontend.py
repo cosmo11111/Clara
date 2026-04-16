@@ -30,6 +30,10 @@ st.markdown("""
   section[data-testid="stSidebar"] * { color: #c9c7c0 !important; }
   /* Hide auto-generated page list */
   [data-testid="stSidebarNav"] { display: none !important; }
+  /* Upgrade button — yellow bg needs black text */
+  section[data-testid="stSidebar"] button[kind="primary"] { color: #0f0f13 !important; }
+  /* No scrollbar on sidebar */
+  section[data-testid="stSidebar"] > div { overflow: hidden !important; }
   section[data-testid="stSidebar"] .stSelectbox label,
   section[data-testid="stSidebar"] .stSlider label { color: #888 !important; }
 
@@ -327,7 +331,6 @@ with st.sidebar:
             del st.session_state[k]
         render_page_b64.clear()
         st.rerun()
-    st.markdown("---")
 
     # Step progress
     steps = [
@@ -343,8 +346,6 @@ with st.sidebar:
             <div class="step-text"><b>{label}</b></div>
         </div>""", unsafe_allow_html=True)
 
-    st.markdown("---")
-
     # Redaction defaults (controls removed from sidebar)
     color = "Yellow"
     snap  = True
@@ -357,7 +358,6 @@ require_auth()
 # ── User menu in sidebar ──────────────────────────────────────────────────────
 user = get_user()
 with st.sidebar:
-    st.markdown("---")
     if user:
         email = user.email if hasattr(user, "email") else user.get("email", "")
         uid_sb = user.id if hasattr(user, "id") else user.get("id") if user else None
