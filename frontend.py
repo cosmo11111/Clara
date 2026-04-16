@@ -35,6 +35,8 @@ st.markdown("""
   [data-testid="stToolbar"] { display: none !important; }
   /* Upgrade button — yellow bg needs black text */
   section[data-testid="stSidebar"] button[kind="primary"] { color: #0f0f13 !important; }
+  section[data-testid="stSidebar"] button[kind="primary"] * { color: #0f0f13 !important; }
+  section[data-testid="stSidebar"] button[kind="primary"] p { color: #0f0f13 !important; }
   /* No scrollbar on sidebar */
   section[data-testid="stSidebar"] > div { overflow: hidden !important; }
   /* Flex layout: top / middle / bottom */
