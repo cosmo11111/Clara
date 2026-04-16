@@ -650,7 +650,7 @@ if st.session_state.step in (1, 2):
             st.markdown("### How it works")
             st.markdown("""<div class="card">
                 <h3>🔒 Privacy first</h3>
-                <p>You control what the AI sees. Redact account numbers, BSBs, names, and addresses before analysis.</p>
+                <p>Before the AI reads anything, you can black out sensitive details such as account numbers, BSBs, names, addresses, or anything else you'd rather keep private. Redacted areas are permanently removed from the document the AI receives. We don't store your PDF at any point. Your bank statement never leaves your control.</p>
             </div>
             <div class="card">
                 <h3>🤖 Gemini AI</h3>
