@@ -34,6 +34,17 @@ st.markdown("""
   section[data-testid="stSidebar"] button[kind="primary"] { color: #0f0f13 !important; }
   /* No scrollbar on sidebar */
   section[data-testid="stSidebar"] > div { overflow: hidden !important; }
+  /* Flex layout: top / middle / bottom */
+  section[data-testid="stSidebar"] > div > div[data-testid="stVerticalBlock"] {
+      display: flex !important;
+      flex-direction: column !important;
+      height: 100vh !important;
+  }
+  div[data-testid="stSidebarUserContent"] {
+      display: flex !important;
+      flex-direction: column !important;
+      height: 100% !important;
+  }
   section[data-testid="stSidebar"] .stSelectbox label,
   section[data-testid="stSidebar"] .stSlider label { color: #888 !important; }
 
@@ -322,6 +333,7 @@ Bank statement text:
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
+    # Top: Home button
     if st.button("⌂ Home", use_container_width=True):
         for k in ["step","pdf_bytes","redacted_pdf_bytes","annotations",
                   "pending","page_num","transactions","categorized",
@@ -332,7 +344,8 @@ with st.sidebar:
         render_page_b64.clear()
         st.rerun()
 
-    # Step progress
+    # Middle: Step progress (flex-grow pushes user section to bottom)
+    st.markdown("<div style='flex:1;padding-top:2rem'>", unsafe_allow_html=True)
     steps = [
         (1, "Upload statement"),
         (2, "Redact private info"),
@@ -345,6 +358,7 @@ with st.sidebar:
             <div class="step-num {cls}">{icon}</div>
             <div class="step-text"><b>{label}</b></div>
         </div>""", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     # Redaction defaults (controls removed from sidebar)
     color = "Yellow"
@@ -402,15 +416,14 @@ with st.sidebar:
         </div>
         """, unsafe_allow_html=True)
 
-        btn_label = "📂 Saved Reports"
         if tier == "free_trial":
             if st.button("⚡ Upgrade plan", use_container_width=True, type="primary"):
                 st.switch_page("pages/5_pricing.py")
         elif tier == "starter":
-            if st.button("⚡ Upgrade to Unlimited", use_container_width=True):
+            if st.button("⚡ Upgrade to Unlimited", use_container_width=True, type="primary"):
                 st.switch_page("pages/5_pricing.py")
         else:
-            if st.button("⚡ Manage plan", use_container_width=True):
+            if st.button("⚡ Manage plan", use_container_width=True, type="primary"):
                 st.switch_page("pages/5_pricing.py")
 
         if st.button("📂 Saved Reports", use_container_width=True):
