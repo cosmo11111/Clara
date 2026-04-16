@@ -19,6 +19,30 @@ from db import (
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Expense Categorizer", page_icon="💳", layout="wide")
 
+# ── Auth check before anything renders ────────────────────────────────────────
+# Show a branded loading screen immediately, then redirect if not logged in.
+# This prevents the upload page flashing before the login redirect.
+from auth import is_logged_in
+if not is_logged_in():
+    st.markdown("""
+    <style>
+      html, body, .stApp { background-color:#0f0f13; }
+      #MainMenu, footer, header { visibility:hidden; }
+      [data-testid="stSidebar"] { display:none; }
+      [data-testid="stToolbar"] { display:none; }
+    </style>
+    <div style="display:flex;flex-direction:column;align-items:center;
+                justify-content:center;height:100vh;background:#0f0f13">
+      <div style="font-family:'DM Sans',sans-serif;font-size:2.4rem;font-weight:700;
+                  font-style:italic;color:#f0c040;letter-spacing:.04em;margin-bottom:16px">
+        CATEGORIZ
+      </div>
+      <div style="color:#555;font-size:.9rem">Loading...</div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.switch_page("pages/1_login.py")
+    st.stop()
+
 st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
@@ -659,7 +683,7 @@ if st.session_state.step in (1, 2):
             </div>
             <div class="card">
                 <h3>🤖 AI categorization</h3>
-                <p>Our AI then categorizes each transaction within your statement. You can add your own custom categories, edit any categorization,  and set vendor rules so your regular merchants are always categorized correctly in future uploads.</p>
+                <p>Our AI then categorizes each transaction within your statement. You can add your own custom categories, edit any categorization, and set vendor rules so your regular merchants are always categorized correctly in future uploads.</p>
             </div>
             <div class="card">
                 <h3>📊 Instant insights</h3>
