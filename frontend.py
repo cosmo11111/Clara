@@ -444,7 +444,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 if st.session_state.step == 1:
     st.markdown("*AI-powered bank statement analysis with privacy-first redaction*")
-st.markdown("---")
 
 # ═══════════════════════════════════════════════════════════
 # STEP 1 + 2 — Upload & Redact (single combined page)
