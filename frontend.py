@@ -461,7 +461,7 @@ if st.session_state.step in (1, 2):
         with bar1:
             redact_btn = st.button(
                 "⬛ Redact Selection  [R]",
-                use_container_width=True, type="primary",
+                use_container_width=True,
                 disabled=st.session_state.pending is None,
             )
         with bar2:
@@ -471,8 +471,10 @@ if st.session_state.step in (1, 2):
                 disabled=not st.session_state.annotations.get(pk),
             )
         with bar3:
-            label = f"Analyse ({rd_total} redaction{'s' if rd_total!=1 else ''}) →" if rd_total else "Analyse (no redactions) →"
-            analyse_btn = st.button(label, use_container_width=True)
+            analyse_btn = st.button(
+                "🤖 Categorize Transactions",
+                use_container_width=True, type="primary",
+            )
         with bar4:
             # Page nav inline
             pn_c1, pn_c2, pn_c3 = st.columns([1, 2, 1])
@@ -533,6 +535,7 @@ if st.session_state.step in (1, 2):
                 else:
                     st.session_state.redacted_pdf_bytes = pdf_bytes
             st.session_state.step = 3
+            st.session_state.categorized = False
             st.rerun()
 
         # ── Keyboard shortcuts ────────────────────────────────────────────────
@@ -638,7 +641,6 @@ if st.session_state.step in (1, 2):
 
     if not pdf_loaded and info_col is not None:
         with info_col:
-            st.markdown("<div style='margin-top:-2.1rem'></div>", unsafe_allow_html=True)
             st.markdown("### The Process")
             st.markdown("""<div class="card">
                 <h3>🔒 Privacy first</h3>
@@ -654,24 +656,10 @@ if st.session_state.step in (1, 2):
             </div>""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════
-# STEP 3 — Categorize
+# STEP 3 — Results (auto-runs AI on arrival)
 # ═══════════════════════════════════════════════════════════
 elif st.session_state.step == 3:
-    st.markdown("### Step 3 — AI Expense Categorization")
-
-    rd_count = sum(len(v) for v in st.session_state.annotations.values())
-    if rd_count:
-        st.markdown(f'<div class="info-box green">🔒 {rd_count} redaction{"s" if rd_count!=1 else ""} applied — the AI will not see that content.</div>', unsafe_allow_html=True)
-    else:
-        st.markdown('<div class="info-box blue">ℹ️ No redactions applied. The full document will be analysed.</div>', unsafe_allow_html=True)
-
-    col_btn1, col_btn2, _ = st.columns([1,1,3])
-    with col_btn1:
-        run = st.button("🤖 Categorize Transactions", type="primary", use_container_width=True)
-    with col_btn2:
-        if st.button("← Back to Redaction", use_container_width=True):
-            st.session_state.step = 2
-            st.rerun()
+    run = not st.session_state.categorized
 
     if run:
         # ── Usage gate ────────────────────────────────────────────────────────
