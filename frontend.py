@@ -369,53 +369,40 @@ with st.sidebar:
 # ── Auth guard ───────────────────────────────────────────────────────────────
 require_auth()
 
-# ── User menu in sidebar ──────────────────────────────────────────────────────
+# ── User menu — anchored to bottom of sidebar ────────────────────────────────
 user = get_user()
-with st.sidebar:
-    if user:
-        email = user.email if hasattr(user, "email") else user.get("email", "")
-        uid_sb = user.id if hasattr(user, "id") else user.get("id") if user else None
+if user:
+    email  = user.email if hasattr(user, "email") else user.get("email", "")
+    uid_sb = user.id if hasattr(user, "id") else user.get("id") if user else None
+    from db import get_profile, TIER_LABELS, TIER_LIMITS
+    profile    = get_profile(uid_sb) if uid_sb else {}
+    tier       = profile.get("subscription_tier", "free_trial")
+    used       = profile.get("analyses_used", 0)
+    limit      = profile.get("analyses_limit", 3)
+    TIER_COLORS = {"free_trial":"#666","starter":"#3b82f6","unlimited":"#f0c040"}
+    tier_color = TIER_COLORS.get(tier, "#666")
+    tier_label = TIER_LABELS.get(tier, "Free Trial")
+    if tier == "unlimited":
+        usage_str = "Unlimited analyses"
+    elif tier == "free_trial":
+        usage_str = f"{used}/3 lifetime analyses"
+    else:
+        usage_str = f"{used}/{limit} analyses this month"
 
-        # ── Tier badge ────────────────────────────────────────────────────────
-        from db import get_profile, TIER_LABELS, TIER_LIMITS
-        profile = get_profile(uid_sb) if uid_sb else {}
-        tier    = profile.get("subscription_tier", "free_trial")
-        used    = profile.get("analyses_used", 0)
-        limit   = profile.get("analyses_limit", 3)
-
-        TIER_COLORS = {
-            "free_trial": "#666",
-            "starter":    "#3b82f6",
-            "unlimited":  "#f0c040",
-        }
-        tier_color = TIER_COLORS.get(tier, "#666")
-        tier_label = TIER_LABELS.get(tier, "Free Trial")
-
+    with st.sidebar.container(key="sidebar_bottom"):
         st.markdown(f"<p style='color:#888;font-size:.8rem;margin-bottom:2px'>Signed in as</p>",
                     unsafe_allow_html=True)
         st.markdown(f"<p style='color:#e8e6e1;font-size:.85rem;font-weight:500;"
                     f"word-break:break-all;margin-bottom:8px'>{email}</p>",
                     unsafe_allow_html=True)
-
-        # Plan badge + usage
-        if tier == "unlimited":
-            usage_str = "Unlimited analyses"
-        elif tier == "free_trial":
-            usage_str = f"{used}/3 lifetime analyses"
-        else:
-            usage_str = f"{used}/{limit} analyses this month"
-
         st.markdown(f"""
         <div style="background:#1a1a24;border:1px solid #2a2a38;border-radius:8px;
                     padding:8px 12px;margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:11px;font-weight:600;color:{tier_color};
-                         text-transform:uppercase;letter-spacing:.05em">{tier_label}</span>
-          </div>
+          <span style="font-size:11px;font-weight:600;color:{tier_color};
+                       text-transform:uppercase;letter-spacing:.05em">{tier_label}</span>
           <div style="font-size:11px;color:#555;margin-top:2px">{usage_str}</div>
         </div>
         """, unsafe_allow_html=True)
-
         if tier == "free_trial":
             if st.button("⚡ Upgrade plan", use_container_width=True, type="primary"):
                 st.switch_page("pages/5_pricing.py")
@@ -425,7 +412,6 @@ with st.sidebar:
         else:
             if st.button("⚡ Manage plan", use_container_width=True, type="primary"):
                 st.switch_page("pages/5_pricing.py")
-
         if st.button("📂 Saved Reports", use_container_width=True):
             st.switch_page("pages/4_reports.py")
         if st.button("Sign out", use_container_width=True):
@@ -435,6 +421,18 @@ with st.sidebar:
                 pass
             clear_session()
             st.switch_page("pages/1_login.py")
+
+    st.html("""
+    <style>
+      .st-key-sidebar_bottom {
+        position: absolute;
+        bottom: 16px;
+        left: 0;
+        right: 0;
+        padding: 0 1rem;
+      }
+    </style>
+    """)
 
 st.markdown("""
 <div style="padding:12px 0 4px">
