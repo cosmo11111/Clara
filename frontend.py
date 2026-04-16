@@ -28,6 +28,8 @@ st.markdown("""
   /* Sidebar */
   section[data-testid="stSidebar"] { background: #17171d !important; border-right: 1px solid #2a2a35; }
   section[data-testid="stSidebar"] * { color: #c9c7c0 !important; }
+  /* Hide auto-generated page list */
+  [data-testid="stSidebarNav"] { display: none !important; }
   section[data-testid="stSidebar"] .stSelectbox label,
   section[data-testid="stSidebar"] .stSlider label { color: #888 !important; }
 
@@ -343,26 +345,10 @@ with st.sidebar:
 
     st.markdown("---")
 
-    if st.session_state.step == 2:
-        st.markdown("**Redaction tools**")
-        color = st.selectbox("Highlight colour", list(COLORS_RGB.keys()))
-        zoom  = st.slider("Zoom", 1.0, 3.0, st.session_state.zoom, 0.25)
-        if zoom != st.session_state.zoom:
-            st.session_state.zoom = zoom
-            render_page_b64.clear()
-        snap = st.toggle("Snap to words", value=True)
-        st.markdown("---")
-        rd = sum(1 for v in st.session_state.annotations.values() for a in v if a["type"]=="redact")
-        if rd:
-            st.markdown(f'<div class="info-box red">⬛ {rd} redaction{"s" if rd!=1 else ""} pending</div>', unsafe_allow_html=True)
-        if st.button("🗑️ Clear redactions", use_container_width=True):
-            st.session_state.annotations = {}
-            st.session_state.pending = None
-            st.rerun()
-    else:
-        color = "Yellow"
-        snap = True
-        zoom = st.session_state.zoom
+    # Redaction defaults (controls removed from sidebar)
+    color = "Yellow"
+    snap  = True
+    zoom  = st.session_state.zoom
 
 # ── Header ────────────────────────────────────────────────────────────────────
 # ── Auth guard ───────────────────────────────────────────────────────────────
