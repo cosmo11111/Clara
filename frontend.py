@@ -886,8 +886,17 @@ elif st.session_state.step == 3:
         # IMPORTANT: we do NOT write widget values back to rows[] during render.
         # Widget state lives in st.session_state under td_{i}_* keys.
         # We only sync back to tx_rows when delete/add fires (via rerun).
+        # Column headers
+        h_date, h_vendor, h_raw, h_amt, h_cat, h_del = st.columns([1.3, 2.0, 2.0, 1.3, 3.4, 0.6])
+        with h_date:  st.markdown("<p style='font-size:.75rem;color:#555;margin:0'>Date</p>", unsafe_allow_html=True)
+        with h_vendor: st.markdown("<p style='font-size:.75rem;color:#555;margin:0'>Vendor</p>", unsafe_allow_html=True)
+        with h_raw:   st.markdown("<p style='font-size:.75rem;color:#555;margin:0'>Raw description</p>", unsafe_allow_html=True)
+        with h_amt:   st.markdown("<p style='font-size:.75rem;color:#555;margin:0'>Amount</p>", unsafe_allow_html=True)
+        with h_cat:   st.markdown("<p style='font-size:.75rem;color:#555;margin:0'>Category</p>", unsafe_allow_html=True)
+        with h_del:   st.markdown("<p style='font-size:.75rem;color:#555;margin:0'></p>", unsafe_allow_html=True)
+
         for i, row in enumerate(rows):
-            c_date, c_name, c_amt, c_cat, c_del = st.columns([1.3, 3.0, 1.3, 3.4, 0.6])
+            c_date, c_name, c_raw, c_amt, c_cat, c_del = st.columns([1.3, 2.0, 2.0, 1.3, 3.4, 0.6])
 
             with c_date:
                 st.text_input("Date", value=str(row.get("date","")),
@@ -895,11 +904,24 @@ elif st.session_state.step == 3:
                               key=f"td_{i}_date", placeholder="DD MMM YYYY")
 
             with c_name:
-                # Show cleaned vendor name if available, fall back to raw name
-                display_name = row.get("vendor_clean") or row.get("name", "")
-                st.text_input("Vendor", value=str(display_name),
+                # Cleaned vendor name — editable
+                raw_val = row.get("vendor_clean") or row.get("name", "")
+                if str(raw_val).lower() in ("nan", "none", ""):
+                    raw_val = row.get("name", "")
+                st.text_input("Vendor", value=str(raw_val),
                               label_visibility="collapsed",
                               key=f"td_{i}_name", placeholder="Vendor")
+
+            with c_raw:
+                # Raw bank description — read only display
+                raw_desc = str(row.get("name", ""))
+                if raw_desc.lower() in ("nan", "none"):
+                    raw_desc = ""
+                st.markdown(
+                    f"<p style='font-size:.8rem;color:#555;margin:6px 0;overflow:hidden;"
+                    f"white-space:nowrap;text-overflow:ellipsis' title='{raw_desc}'>{raw_desc}</p>",
+                    unsafe_allow_html=True
+                )
 
             with c_amt:
                 st.text_input("Amount", value=str(row.get("amount","")),
@@ -1073,18 +1095,28 @@ elif st.session_state.step == 3:
 
                     with vtab1:
                         # Use vendor_clean for grouping if available
-                        vname_col = "vendor_clean" if "vendor_clean" in spend_df.columns else "name"
-                        spend_df["_vendor"] = spend_df[vname_col].fillna(spend_df["name"])
-                        by_value = (spend_df.groupby("_vendor")["amount_abs"]
+                        # Build clean vendor column — no NaN, no "nan" strings
+                        if "vendor_clean" in spend_df.columns:
+                            spend_df["vendor"] = (spend_df["vendor_clean"]
+                                                  .replace("nan", None)
+                                                  .fillna(spend_df["name"])
+                                                  .replace("", None)
+                                                  .fillna(spend_df["name"]))
+                        else:
+                            spend_df["vendor"] = spend_df["name"]
+                        spend_df["vendor"] = spend_df["vendor"].astype(str).str.strip()
+
+                        by_value = (spend_df.groupby("vendor")["amount_abs"]
                                     .sum().sort_values(ascending=False)
                                     .head(5).reset_index())
                         max_val = by_value["amount_abs"].max()
                         rows_html = ""
-                        for rank, row in enumerate(by_value.itertuples(), 1):
-                            bar_pct = int(row.amount_abs / max_val * 100)
+                        for rank, (_, vrow) in enumerate(by_value.iterrows(), 1):
+                            vname   = vrow["vendor"]
+                            bar_pct = int(vrow["amount_abs"] / max_val * 100)
+                            matched = spend_df[spend_df["vendor"] == vname]["category"].mode()
                             color   = CATEGORY_COLORS.get(
-                                spend_df[spend_df["_vendor"]==row._vendor]["category"].mode().iloc[0]
-                                if not spend_df[spend_df["_vendor"]==row._vendor].empty else "Unknown",
+                                matched.iloc[0] if not matched.empty else "Unknown",
                                 "#6b7280"
                             )
                             rows_html += f"""
@@ -1093,10 +1125,10 @@ elif st.session_state.step == 3:
                                           align-items:baseline;margin-bottom:5px">
                                 <span style="font-size:.85rem;color:#e8e6e1;
                                              white-space:nowrap;overflow:hidden;
-                                             text-overflow:ellipsis;max-width:65%">{row._vendor}</span>
+                                             text-overflow:ellipsis;max-width:65%">{vname}</span>
                                 <span style="font-size:.85rem;font-weight:500;
                                              color:#e8e6e1;font-family:'DM Mono',monospace">
-                                  ${row.amount_abs:,.2f}</span>
+                                  ${vrow["amount_abs"]:,.2f}</span>
                               </div>
                               <div style="background:#1e1e28;border-radius:3px;height:4px">
                                 <div style="width:{bar_pct}%;height:4px;border-radius:3px;
@@ -1106,18 +1138,19 @@ elif st.session_state.step == 3:
                         st.markdown(rows_html, unsafe_allow_html=True)
 
                     with vtab2:
-                        by_count = (spend_df.groupby("_vendor")
+                        by_count = (spend_df.groupby("vendor")
                                     .agg(charges=("amount_abs","count"),
                                          total=("amount_abs","sum"))
                                     .sort_values("charges", ascending=False)
                                     .head(5).reset_index())
                         max_count = by_count["charges"].max()
                         rows_html = ""
-                        for rank, row in enumerate(by_count.itertuples(), 1):
-                            bar_pct = int(row.charges / max_count * 100)
+                        for rank, (_, vrow) in enumerate(by_count.iterrows(), 1):
+                            vname   = vrow["vendor"]
+                            bar_pct = int(vrow["charges"] / max_count * 100)
+                            matched = spend_df[spend_df["vendor"] == vname]["category"].mode()
                             color   = CATEGORY_COLORS.get(
-                                spend_df[spend_df["_vendor"]==row._vendor]["category"].mode().iloc[0]
-                                if not spend_df[spend_df["_vendor"]==row._vendor].empty else "Unknown",
+                                matched.iloc[0] if not matched.empty else "Unknown",
                                 "#6b7280"
                             )
                             rows_html += f"""
@@ -1126,12 +1159,12 @@ elif st.session_state.step == 3:
                                           align-items:baseline;margin-bottom:5px">
                                 <span style="font-size:.85rem;color:#e8e6e1;
                                              white-space:nowrap;overflow:hidden;
-                                             text-overflow:ellipsis;max-width:65%">{row._vendor}</span>
+                                             text-overflow:ellipsis;max-width:65%">{vname}</span>
                                 <span style="font-size:.75rem;color:#888">
-                                  {row.charges} charge{'s' if row.charges!=1 else ''}
+                                  {int(vrow["charges"])} charge{'s' if int(vrow["charges"])!=1 else ''}
                                   &nbsp;·&nbsp;
                                   <span style="color:#e8e6e1;font-family:'DM Mono',monospace">
-                                    ${row.total:,.2f}</span></span>
+                                    ${vrow["total"]:,.2f}</span></span>
                               </div>
                               <div style="background:#1e1e28;border-radius:3px;height:4px">
                                 <div style="width:{bar_pct}%;height:4px;border-radius:3px;
