@@ -442,7 +442,8 @@ st.markdown("""
                font-style:italic;color:#f0c040;letter-spacing:.04em">CATEGORIZ</span>
 </div>
 """, unsafe_allow_html=True)
-st.markdown("*AI-powered bank statement analysis with privacy-first redaction*")
+if st.session_state.step == 1:
+    st.markdown("*AI-powered bank statement analysis with privacy-first redaction*")
 st.markdown("---")
 
 # ═══════════════════════════════════════════════════════════
