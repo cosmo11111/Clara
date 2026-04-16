@@ -158,7 +158,7 @@ def load_reports(user_id: str) -> list[dict]:
     try:
         sb  = get_supabase()
         res = sb.table("expense_reports") \
-                .select("id, label, period_start, period_end, total_spend, total_income, created_at") \
+                .select("id, label, period_start, period_end, total_spend, total_income, category_totals, transaction_count, tier_required, created_at") \
                 .eq("user_id", user_id) \
                 .order("created_at", desc=True) \
                 .execute()
@@ -169,12 +169,16 @@ def load_reports(user_id: str) -> list[dict]:
 
 def save_report(user_id: str, label: str,
                 period_start: str | None, period_end: str | None,
-                transactions: list[dict]) -> tuple[bool, str]:
+                transactions: list[dict],
+                tier_required: str = "starter") -> tuple[bool, str]:
     """
     Save a labelled expense report and its line items.
-    transactions: list of dicts with keys date, name, amount, category.
+    transactions: list of dicts with keys date, name, vendor_clean, amount, category.
+    vendor_clean is the AI-normalised name (e.g. "Ampol").
+    name is the raw bank description (e.g. "AMPOL SUBIACO 44321F").
     No PDF content is ever stored.
     """
+    import json
     try:
         sb = get_supabase()
 
@@ -184,14 +188,26 @@ def save_report(user_id: str, label: str,
         total_income = sum(float(t["amount"]) for t in transactions
                            if float(t["amount"]) > 0)
 
+        # Build category_totals JSON from spending transactions
+        cat_totals: dict[str, float] = {}
+        for t in transactions:
+            if float(t["amount"]) < 0:
+                cat = t.get("category", "Unknown")
+                cat_totals[cat] = round(
+                    cat_totals.get(cat, 0) + abs(float(t["amount"])), 2
+                )
+
         # Insert the report header
         report_res = sb.table("expense_reports").insert({
-            "user_id":       user_id,
-            "label":         label.strip(),
-            "period_start":  period_start or None,
-            "period_end":    period_end   or None,
-            "total_spend":   round(total_spend,  2),
-            "total_income":  round(total_income, 2),
+            "user_id":           user_id,
+            "label":             label.strip(),
+            "period_start":      period_start or None,
+            "period_end":        period_end   or None,
+            "total_spend":       round(total_spend,  2),
+            "total_income":      round(total_income, 2),
+            "category_totals":   cat_totals,
+            "transaction_count": len(transactions),
+            "tier_required":     tier_required,
         }).execute()
 
         report_id = report_res.data[0]["id"]
@@ -199,16 +215,18 @@ def save_report(user_id: str, label: str,
         # Insert line items in one batch
         items = []
         for t in transactions:
-            vendor  = t.get("name", "") or ""
-            is_redacted = vendor.strip().lower() in ("", "unknown")
+            raw_name    = t.get("name", "") or ""
+            clean_name  = t.get("vendor_clean", "") or raw_name
+            is_redacted = raw_name.strip().lower() in ("", "unknown")
             items.append({
-                "report_id":   report_id,
-                "user_id":     user_id,
-                "date":        str(t.get("date", "")),
-                "vendor_name": vendor if not is_redacted else None,
-                "amount":      round(float(t["amount"]), 2),
-                "category":    t.get("category", "Unknown"),
-                "is_redacted": is_redacted,
+                "report_id":        report_id,
+                "user_id":          user_id,
+                "date":             str(t.get("date", "")),
+                "vendor_name":      raw_name    if not is_redacted else None,
+                "vendor_name_clean": clean_name if not is_redacted else None,
+                "amount":           round(float(t["amount"]), 2),
+                "category":         t.get("category", "Unknown"),
+                "is_redacted":      is_redacted,
             })
 
         sb.table("line_items").insert(items).execute()
@@ -223,11 +241,7 @@ def load_report_items(report_id: str) -> list[dict]:
     """Load line items for a specific saved report."""
     try:
         sb  = get_supabase()
-        res = sb.table("line_items") \
-                .select("date, vendor_name, amount, category, is_redacted") \
-                .eq("report_id", report_id) \
-                .order("created_at") \
-                .execute()
+        res = sb.table("line_items")                 .select("date, vendor_name, vendor_name_clean, amount, category, is_redacted")                 .eq("report_id", report_id)                 .order("created_at")                 .execute()
         return res.data or []
     except Exception:
         return []
