@@ -57,18 +57,35 @@ used    = profile.get("analyses_used", 0)
 limit   = profile.get("analyses_limit", 3)
 
 with st.sidebar:
-    st.markdown("## 💳 Categoriz")
-    st.markdown("---")
-    st.markdown(f"<p style='color:#888;font-size:.8rem;margin:0'>Signed in as</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='color:#e8e6e1;font-size:.85rem;font-weight:500'>{email}</p>", unsafe_allow_html=True)
-    st.markdown("---")
-    if st.button("← Back to app", use_container_width=True):
+    if st.button("⌂ Home", use_container_width=True):
         st.switch_page("frontend.py")
+    st.markdown("<div style='padding-top:20vh'>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+with st.sidebar.container(key="sidebar_bottom"):
+    st.markdown(f"<p style='color:#888;font-size:.8rem;margin-bottom:2px'>Signed in as</p>",
+                unsafe_allow_html=True)
+    st.markdown(f"<p style='color:#e8e6e1;font-size:.85rem;font-weight:500;"
+                f"word-break:break-all;margin-bottom:8px'>{email}</p>",
+                unsafe_allow_html=True)
     if st.button("Sign out", use_container_width=True):
         try: get_supabase().auth.sign_out()
         except: pass
         clear_session()
         st.switch_page("pages/1_login.py")
+
+st.html("""
+<style>
+  .st-key-sidebar_bottom {
+    position: absolute;
+    bottom: 16px;
+    left: 0;
+    right: 0;
+    padding: 0 1rem;
+  }
+</style>
+""")
+
 
 # ── Handle successful Stripe redirect ─────────────────────────────────────────
 qp = st.query_params
@@ -220,8 +237,8 @@ if st.session_state.get("_checkout_tier"):
         checkout = stripe.checkout.Session.create(
             mode="subscription",
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=f"{app_url}/5_pricing?success=1",
-            cancel_url=f"{app_url}/5_pricing?cancelled=1",
+            success_url=f"{app_url}/pricing?success=1",
+            cancel_url=f"{app_url}/pricing?cancelled=1",
             client_reference_id=uid,
             customer_email=email,
             metadata={"uid": uid, "tier": chosen_tier},
