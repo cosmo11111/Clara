@@ -973,8 +973,10 @@ elif st.session_state.step == 3:
                     ))
                     centre_text = f"${total_spend_abs:,.0f}" if not show_pct else "100%"
                     fig_pie.update_layout(
-                        height=380, margin=dict(l=10,r=10,t=30,b=10),
-                        paper_bgcolor="#1e1e28",
+                        height=400,
+                        margin=dict(l=40, r=40, t=60, b=40),
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
                         font=dict(color="#c9c7c0", size=11, family="DM Sans"),
                         showlegend=False,
                         annotations=[dict(
@@ -982,33 +984,78 @@ elif st.session_state.step == 3:
                             x=0.5, y=0.5, font=dict(size=14, color="#e8e6e1"), showarrow=False,
                         )],
                     )
-                    st.plotly_chart(fig_pie, use_container_width=True)
+                    st.plotly_chart(fig_pie, use_container_width=True,
+                                    config={"displayModeBar": False})
 
                 with vendor_col:
                     st.markdown("#### Top Vendors")
-                    vtab1, vtab2 = st.tabs(["💰 By Value", "🔢 By Charges"])
+                    vtab1, vtab2 = st.tabs(["By value", "By charges"])
+
                     with vtab1:
                         by_value = (spend_df.groupby("name")["amount_abs"]
                                     .sum().sort_values(ascending=False)
-                                    .head(3).reset_index())
-                        by_value.columns = ["Vendor", "Total Spent"]
-                        by_value["Total Spent"] = by_value["Total Spent"].map(lambda x: f"${x:,.2f}")
-                        by_value.index = by_value.index + 1
-                        st.dataframe(by_value, use_container_width=True, height=340,
-                                     column_config={"Vendor": st.column_config.TextColumn("Vendor"),
-                                                    "Total Spent": st.column_config.TextColumn("Total Spent")})
+                                    .head(5).reset_index())
+                        max_val = by_value["amount_abs"].max()
+                        rows_html = ""
+                        for rank, row in enumerate(by_value.itertuples(), 1):
+                            bar_pct = int(row.amount_abs / max_val * 100)
+                            color   = CATEGORY_COLORS.get(
+                                spend_df[spend_df["name"]==row.name]["category"].mode().iloc[0]
+                                if not spend_df[spend_df["name"]==row.name].empty else "Unknown",
+                                "#6b7280"
+                            )
+                            rows_html += f"""
+                            <div style="padding:10px 0;border-bottom:1px solid #1e1e28">
+                              <div style="display:flex;justify-content:space-between;
+                                          align-items:baseline;margin-bottom:5px">
+                                <span style="font-size:.85rem;color:#e8e6e1;
+                                             white-space:nowrap;overflow:hidden;
+                                             text-overflow:ellipsis;max-width:65%">{row.name}</span>
+                                <span style="font-size:.85rem;font-weight:500;
+                                             color:#e8e6e1;font-family:'DM Mono',monospace">
+                                  ${row.amount_abs:,.2f}</span>
+                              </div>
+                              <div style="background:#1e1e28;border-radius:3px;height:4px">
+                                <div style="width:{bar_pct}%;height:4px;border-radius:3px;
+                                            background:{color}"></div>
+                              </div>
+                            </div>"""
+                        st.markdown(rows_html, unsafe_allow_html=True)
+
                     with vtab2:
                         by_count = (spend_df.groupby("name")
-                                    .agg(Charges=("amount_abs","count"), Total=("amount_abs","sum"))
-                                    .sort_values("Charges", ascending=False)
-                                    .head(3).reset_index())
-                        by_count.columns = ["Vendor", "Charges", "Total Spent"]
-                        by_count["Total Spent"] = by_count["Total Spent"].map(lambda x: f"${x:,.2f}")
-                        by_count.index = by_count.index + 1
-                        st.dataframe(by_count, use_container_width=True, height=340,
-                                     column_config={"Vendor": st.column_config.TextColumn("Vendor"),
-                                                    "Charges": st.column_config.NumberColumn("Charges"),
-                                                    "Total Spent": st.column_config.TextColumn("Total Spent")})
+                                    .agg(charges=("amount_abs","count"),
+                                         total=("amount_abs","sum"))
+                                    .sort_values("charges", ascending=False)
+                                    .head(5).reset_index())
+                        max_count = by_count["charges"].max()
+                        rows_html = ""
+                        for rank, row in enumerate(by_count.itertuples(), 1):
+                            bar_pct = int(row.charges / max_count * 100)
+                            color   = CATEGORY_COLORS.get(
+                                spend_df[spend_df["name"]==row.name]["category"].mode().iloc[0]
+                                if not spend_df[spend_df["name"]==row.name].empty else "Unknown",
+                                "#6b7280"
+                            )
+                            rows_html += f"""
+                            <div style="padding:10px 0;border-bottom:1px solid #1e1e28">
+                              <div style="display:flex;justify-content:space-between;
+                                          align-items:baseline;margin-bottom:5px">
+                                <span style="font-size:.85rem;color:#e8e6e1;
+                                             white-space:nowrap;overflow:hidden;
+                                             text-overflow:ellipsis;max-width:65%">{row.name}</span>
+                                <span style="font-size:.75rem;color:#888">
+                                  {row.charges} charge{'s' if row.charges!=1 else ''}
+                                  &nbsp;·&nbsp;
+                                  <span style="color:#e8e6e1;font-family:'DM Mono',monospace">
+                                    ${row.total:,.2f}</span></span>
+                              </div>
+                              <div style="background:#1e1e28;border-radius:3px;height:4px">
+                                <div style="width:{bar_pct}%;height:4px;border-radius:3px;
+                                            background:{color}"></div>
+                              </div>
+                            </div>"""
+                        st.markdown(rows_html, unsafe_allow_html=True)
 
         # ── Sentinel: inline add-new-category UI ─────────────────────────────
         if new_cats_needed:
