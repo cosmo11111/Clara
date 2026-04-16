@@ -3,6 +3,23 @@ from auth import get_supabase, set_session, is_logged_in, AUTH_CSS
 
 st.set_page_config(page_title="Login — Expense AI", page_icon="💳", layout="centered")
 st.markdown(AUTH_CSS, unsafe_allow_html=True)
+st.markdown("""
+<style>
+/* Make form submit button yellow with black text */
+div[data-testid="stFormSubmitButton"] button {
+    background-color: #f0c040 !important;
+    color: #0f0f13 !important;
+    border: none !important;
+    font-weight: 600 !important;
+    width: 100% !important;
+}
+div[data-testid="stFormSubmitButton"] button:hover {
+    background-color: #e0b030 !important;
+}
+/* Hide Enter to submit hint */
+[data-testid="InputInstructions"] { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
 
 # Already logged in → go straight to app
 if is_logged_in():
@@ -29,43 +46,10 @@ _, col, _ = st.columns([1, 2, 1])
 with col:
     msg_placeholder = st.empty()
 
-    email    = st.text_input("Email address", placeholder="you@example.com",
-                              key="login_email", label_visibility="visible")
-    password = st.text_input("Password", type="password", placeholder="••••••••",
-                              key="login_password", label_visibility="visible")
-    signin   = st.button("Sign in", type="primary", use_container_width=True,
-                          key="login_btn")
-
-    # Wire Enter key to Sign in button and hide the hint text
-    import streamlit.components.v1 as _c
-    _c.html("""
-<script>
-(function() {
-  // Inject a script tag into the parent document so it runs in the main page
-  // context — not the sandboxed iframe context
-  var s = window.parent.document.createElement('script');
-  s.textContent = `
-    (function() {
-      if (window._loginEnterRegistered) return;
-      window._loginEnterRegistered = true;
-      document.addEventListener('keydown', function(e) {
-        if (e.key !== 'Enter') return;
-        var tag = e.target.tagName.toLowerCase();
-        if (tag !== 'input') return;
-        var btn = document.querySelector('button[data-testid="baseButton-primary"]');
-        if (btn) { e.preventDefault(); btn.click(); }
-      });
-    })();
-  `;
-  window.parent.document.head.appendChild(s);
-
-  // Also hide the "Press Enter to submit" hint via parent CSS
-  var style = window.parent.document.createElement('style');
-  style.textContent = '[data-testid="InputInstructions"] { display:none !important; }';
-  window.parent.document.head.appendChild(style);
-})();
-</script>
-""", height=0)
+    with st.form("login_form", border=False):
+        email    = st.text_input("Email address", placeholder="you@example.com")
+        password = st.text_input("Password", type="password", placeholder="••••••••")
+        signin   = st.form_submit_button("Sign in", use_container_width=True)
 
     if signin:
         if not email or not password:
