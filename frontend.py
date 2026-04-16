@@ -398,7 +398,7 @@ if user:
         st.markdown(f"""
         <div style="background:#1a1a24;border:1px solid #2a2a38;border-radius:8px;
                     padding:8px 12px;margin-bottom:10px">
-          <span style="font-size:11px;font-weight:600;color:{tier_color};
+          <span style="font-size:11px;font-weight:600;
                        text-transform:uppercase;letter-spacing:.05em">{tier_label}</span>
           <div style="font-size:11px;color:#555;margin-top:2px">{usage_str}</div>
         </div>
