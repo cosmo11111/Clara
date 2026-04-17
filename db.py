@@ -165,7 +165,7 @@ def load_reports(user_id: str) -> list[dict]:
     try:
         sb  = get_supabase()
         res = sb.table("expense_reports") \
-                .select("id, label, period_start, period_end, total_spend, total_income, category_totals, monthly_totals, top_vendors, transaction_count, tier_required, created_at") \
+                .select("id, label, period_start, period_end, total_spend, total_income, category_totals, monthly_totals, top_vendors, transaction_count, tier_required, ai_insight, created_at") \
                 .eq("user_id", user_id) \
                 .order("created_at", desc=True) \
                 .execute()
@@ -314,7 +314,8 @@ def check_duplicate_report(user_id: str,
 def save_report(user_id: str, label: str,
                 period_start: str | None, period_end: str | None,
                 transactions: list[dict],
-                tier_required: str = "starter") -> tuple[bool, str]:
+                tier_required: str = "starter",
+                ai_insight: str | None = None) -> tuple[bool, str]:
     """
     Save a labelled expense report.
     - All tiers: saves summary (category_totals, monthly_totals, top_vendors, metrics)
@@ -355,6 +356,7 @@ def save_report(user_id: str, label: str,
             "top_vendors":       top_vendors,
             "transaction_count": len(transactions),
             "tier_required":     tier_required,
+            "ai_insight":        ai_insight or None,
         }).execute()
 
         report_id = report_res.data[0]["id"]
