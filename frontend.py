@@ -693,6 +693,7 @@ if st.session_state.step in (1, 2):
                 st.session_state.redacted_pdf_bytes = None
                 st.session_state.annotations = {}
                 st.session_state.step = 3
+                st.session_state._is_demo = True
                 st.rerun()
 
         with info_col:
@@ -777,6 +778,7 @@ elif st.session_state.step == 3:
                 # Increment usage counter after successful analysis
                 if uid:
                     increment_usage(uid)
+                st.session_state._is_demo = False
             except Exception as e:
                 st.error(f"Gemini error: {e}")
                 st.stop()
@@ -804,6 +806,7 @@ elif st.session_state.step == 3:
 
         # Placeholders — filled after the table renders with live df_edited
         _metrics_placeholder = st.empty()
+        _insight_placeholder = st.empty()
         _charts_placeholder  = st.empty()
 
         # ── Category pie + vendor tables — rendered after table below ─────────
@@ -1034,6 +1037,81 @@ elif st.session_state.step == 3:
         cat_totals = spend_df.groupby("category")["amount_abs"].sum().sort_values(ascending=False)
 
         n_income = len(df_edited[df_edited["amount"] >= 0])
+        # ── AI Insight (above charts) ─────────────────────────────────────────
+        _insight_profile  = get_profile(uid) if uid else {}
+        _insight_tier     = _insight_profile.get("subscription_tier", "free_trial")
+        _is_paid_insight  = _insight_tier in ("starter", "unlimited")
+        _is_demo          = st.session_state.get("_is_demo", False)
+        _cat_totals_dict  = cat_totals.to_dict() if not cat_totals.empty else {}
+        _top_v = []
+        if "vendor" in spend_df.columns:
+            _tv = (spend_df.groupby("vendor")["amount_abs"]
+                   .sum().sort_values(ascending=False).head(3))
+            _top_v = [{"vendor": k, "amount": round(v, 2)} for k, v in _tv.items()]
+
+        if _is_paid_insight and not _is_demo:
+            _insight_key = f"ai_insight_{id(df_edited)}"
+            if _insight_key not in st.session_state:
+                try:
+                    import google.generativeai as _genai
+                    _genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    _imodel = _genai.GenerativeModel("gemini-3-flash-preview")
+                    _iprompt = f"""You are a personal finance assistant. Given this spending summary, provide 1-2 sentences of genuinely useful insight. Focus on something specific and interesting — a pattern, a standout category, a vendor worth noticing, or a spend/income relationship. Be conversational and non-judgmental. Do not restate obvious totals. Do not use the word "great".
+
+Total spend: ${abs(total_spend):,.2f}
+Total income: ${total_income:,.2f}
+Transaction count: {n_tx}
+Category breakdown: {_cat_totals_dict}
+Top vendors: {_top_v}"""
+                    _iresp = _imodel.generate_content(_iprompt)
+                    st.session_state[_insight_key] = _iresp.text.strip()
+                except Exception:
+                    st.session_state[_insight_key] = None
+
+            _insight_text = st.session_state.get(_insight_key)
+            if _insight_text:
+                # Cache for saving with report
+                st.session_state["_insight_to_save"] = _insight_text
+                _insight_placeholder.markdown(f"""
+                <div style="background:#1a1a24;border:1px solid #2a2a38;border-radius:10px;
+                            padding:14px 18px;margin:0 0 16px">
+                  <p style="font-size:.7rem;font-weight:600;color:#f0c040;text-transform:uppercase;
+                            letter-spacing:.08em;margin:0 0 6px">✦ AI Insight</p>
+                  <p style="font-size:.9rem;color:#c9c7c0;line-height:1.6;margin:0">{_insight_text}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            # Free tier or demo — teaser with fade
+            _top_cat_name = cat_totals.index[0] if not cat_totals.empty else "spending"
+            _top_cat_amt  = cat_totals.iloc[0]  if not cat_totals.empty else 0
+            _teasers = [
+                f"Your biggest spending category was {_top_cat_name} at ${_top_cat_amt:,.0f}, which accounts for",
+                f"You made {n_tx} transactions this month, with {_top_v[0]['vendor'] if _top_v else 'your top vendor'} appearing the most",
+                f"Your spending was spread across {len(_cat_totals_dict)} categories, with {_top_cat_name} and",
+                f"This month's total spend of ${abs(total_spend):,.0f} was {'above' if abs(total_spend) > total_income else 'below'} your income, suggesting",
+            ]
+            _teaser = _teasers[hash(str(_cat_totals_dict)) % len(_teasers)]
+            _insight_placeholder.markdown(f"""
+            <div style="background:#1a1a24;border:1px solid #2a2a38;border-radius:10px;
+                        padding:14px 18px;margin:0 0 16px;position:relative;overflow:hidden">
+              <p style="font-size:.7rem;font-weight:600;color:#555;text-transform:uppercase;
+                        letter-spacing:.08em;margin:0 0 6px">✦ AI Insight</p>
+              <p style="font-size:.9rem;color:#c9c7c0;line-height:1.6;margin:0 0 8px">
+                {_teaser}
+                <span style="background:linear-gradient(to right,#c9c7c0,transparent);
+                             -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+                             background-clip:text">
+                  &nbsp;your top categories driving 80% of...
+                </span>
+              </p>
+              <div style="position:absolute;right:0;top:0;bottom:0;width:60%;
+                          background:linear-gradient(to right,transparent,#1a1a24 70%)"></div>
+              <p style="font-size:.8rem;color:#f0c040;margin:0;position:relative;z-index:1">
+                🔒 Upgrade to Starter to unlock AI insights
+              </p>
+            </div>
+            """, unsafe_allow_html=True)
+
         if not cat_totals.empty:
             with _charts_placeholder.container():
                 if n_income > 0:
@@ -1172,82 +1250,6 @@ elif st.session_state.step == 3:
                               </div>
                             </div>"""
                         st.markdown(rows_html, unsafe_allow_html=True)
-
-        # ── AI Insight ────────────────────────────────────────────────────────
-        import random
-        _insight_profile = get_profile(uid) if uid else {}
-        _insight_tier    = _insight_profile.get("subscription_tier", "free_trial")
-        _is_paid_insight = _insight_tier in ("starter", "unlimited")
-
-        # Build data for insight
-        _cat_totals_dict = cat_totals.to_dict() if not cat_totals.empty else {}
-        _top_v = []
-        if "vendor" in spend_df.columns:
-            _tv = (spend_df.groupby("vendor")["amount_abs"]
-                   .sum().sort_values(ascending=False).head(3))
-            _top_v = [{"vendor": k, "amount": round(v, 2)} for k, v in _tv.items()]
-
-        if _is_paid_insight:
-            # Generate or retrieve cached insight
-            _insight_key = f"ai_insight_{id(df_edited)}"
-            if _insight_key not in st.session_state:
-                try:
-                    import google.generativeai as _genai
-                    _genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                    _imodel = _genai.GenerativeModel("gemini-3-flash-preview")
-                    _iprompt = f"""You are a personal finance assistant. Given this spending summary, provide 1-2 sentences of genuinely useful insight. Focus on something specific and interesting — a pattern, a standout category, a vendor worth noticing, or a spend/income relationship. Be conversational and non-judgmental. Do not restate obvious totals. Do not use the word "great".
-
-Total spend: ${abs(total_spend):,.2f}
-Total income: ${total_income:,.2f}
-Transaction count: {n_tx}
-Category breakdown: {_cat_totals_dict}
-Top vendors: {_top_v}"""
-                    _iresp = _imodel.generate_content(_iprompt)
-                    st.session_state[_insight_key] = _iresp.text.strip()
-                except Exception:
-                    st.session_state[_insight_key] = None
-
-            _insight_text = st.session_state.get(_insight_key)
-            if _insight_text:
-                st.markdown(f"""
-                <div style="background:#1a1a24;border:1px solid #2a2a38;border-radius:10px;
-                            padding:14px 18px;margin:16px 0">
-                  <p style="font-size:.7rem;font-weight:600;color:#f0c040;text-transform:uppercase;
-                            letter-spacing:.08em;margin:0 0 6px">✦ AI Insight</p>
-                  <p style="font-size:.9rem;color:#c9c7c0;line-height:1.6;margin:0">{_insight_text}</p>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            # Free tier — teaser phrase with fade
-            _top_cat_name = cat_totals.index[0] if not cat_totals.empty else "spending"
-            _top_cat_amt  = cat_totals.iloc[0]  if not cat_totals.empty else 0
-            _teasers = [
-                f"Your biggest spending category was {_top_cat_name} at ${_top_cat_amt:,.0f}, which accounts for",
-                f"You made {n_tx} transactions this month, with {_top_v[0]['vendor'] if _top_v else 'your top vendor'} appearing the most",
-                f"Your spending was spread across {len(_cat_totals_dict)} categories, with {_top_cat_name} and",
-                f"This month's total spend of ${abs(total_spend):,.0f} was {'above' if abs(total_spend) > total_income else 'below'} your income, suggesting",
-            ]
-            _teaser = _teasers[hash(str(_cat_totals_dict)) % len(_teasers)]
-            st.markdown(f"""
-            <div style="background:#1a1a24;border:1px solid #2a2a38;border-radius:10px;
-                        padding:14px 18px;margin:16px 0;position:relative;overflow:hidden">
-              <p style="font-size:.7rem;font-weight:600;color:#555;text-transform:uppercase;
-                        letter-spacing:.08em;margin:0 0 6px">✦ AI Insight</p>
-              <p style="font-size:.9rem;color:#c9c7c0;line-height:1.6;margin:0 0 8px">
-                {_teaser}
-                <span style="background:linear-gradient(to right,#c9c7c0,transparent);
-                             -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-                             background-clip:text">
-                  &nbsp;your top categories driving 80% of...
-                </span>
-              </p>
-              <div style="position:absolute;right:0;top:0;bottom:0;width:60%;
-                          background:linear-gradient(to right,transparent,#1a1a24 70%)"></div>
-              <p style="font-size:.8rem;color:#f0c040;margin:0;position:relative;z-index:1">
-                🔒 Upgrade to Starter to unlock AI insights
-              </p>
-            </div>
-            """, unsafe_allow_html=True)
 
         # ── Sentinel: inline add-new-category UI ─────────────────────────────
         if new_cats_needed:
@@ -1428,6 +1430,7 @@ Top vendors: {_top_v}"""
                             ps_str, pe_str,
                             save_data,
                             tier_required=_tier_req,
+                            ai_insight=st.session_state.get("_insight_to_save"),
                         )
                         if ok:
                             st.success("✅ Report saved!")
