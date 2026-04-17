@@ -395,21 +395,7 @@ with st.sidebar:
         render_page_b64.clear()
         st.rerun()
 
-    # Step progress — sits directly under the Home button, no offset
-    st.markdown("<div style='padding-top:1rem'>", unsafe_allow_html=True)
-    steps = [
-        (1, "Upload statement"),
-        (2, "Redact private info"),
-        (3, "Categorize expenses"),
-    ]
-    for num, label in steps:
-        cls = "done" if st.session_state.step > num else ("active" if st.session_state.step == num else "")
-        icon = "✓" if st.session_state.step > num else str(num)
-        st.markdown(f"""<div class="step-badge">
-            <div class="step-num {cls}">{icon}</div>
-            <div class="step-text"><b>{label}</b></div>
-        </div>""", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+
 
     # Redaction defaults (controls removed from sidebar)
     color = "Yellow"
@@ -1006,14 +992,10 @@ elif st.session_state.step == 3:
             st.session_state.tx_rows = _rows
             st.session_state._charts_dirty = False
 
-        act1, act2 = st.columns([1, 1])
-        with act1:
-            st.button("＋  Add transaction", use_container_width=True,
-                      on_click=_add_row_cb, key="add_tx_btn")
-        with act2:
-            st.button("📊  Update charts", use_container_width=True,
-                      on_click=_update_charts_cb, key="update_charts_btn",
-                      type="primary")
+        # Auto-sync on every rerun so charts always reflect latest edits
+        _update_charts_cb()
+        st.button("＋  Add transaction", use_container_width=True,
+                  on_click=_add_row_cb, key="add_tx_btn")
 
         # ── Always sync rows back (captures add/delete/category changes) ──────
         # Text field edits are only synced when Update Charts is clicked.
@@ -1273,6 +1255,77 @@ Top vendors: {_top_v}"""
                             </div>"""
                         st.markdown(rows_html, unsafe_allow_html=True)
 
+                    # ── Save report card (inside vendor col) ──────────────────
+                    st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+                    st.markdown("""
+                    <div style="background:#f0c040;border-radius:10px;padding:14px 16px">
+                      <p style="font-size:.75rem;font-weight:600;color:#0f0f13;
+                                text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px">
+                        💾 Save Report
+                      </p>
+                    """, unsafe_allow_html=True)
+                    if not uid:
+                        st.markdown("<p style='color:#0f0f13;font-size:.85rem;margin:0'>Sign in to save reports.</p>", unsafe_allow_html=True)
+                    else:
+                        sv1, sv2 = st.columns([1, 1])
+                        with sv1:
+                            report_label = st.text_input("Label", placeholder="e.g. March 2026",
+                                                         label_visibility="collapsed",
+                                                         key="report_label")
+                        with sv2:
+                            period_start = st.date_input("From", value=None,
+                                                         label_visibility="collapsed",
+                                                         key="period_start")
+                        period_end = st.date_input("To", value=None,
+                                                   label_visibility="collapsed",
+                                                   key="period_end")
+                        ps_str = str(period_start) if period_start else None
+                        pe_str = str(period_end)   if period_end   else None
+                        if ps_str and pe_str and check_duplicate_report(uid, ps_str, pe_str):
+                            st.warning("⚠️ Overlapping report already exists.")
+
+                        if st.button("Save report", use_container_width=True, key="save_report_btn"):
+                            if not report_label.strip():
+                                st.warning("Enter a label.")
+                            else:
+                                _rows = st.session_state.get("tx_rows", [])
+                                for _i in range(len(_rows)):
+                                    _rows[_i]["date"]         = st.session_state.get(f"td_{_i}_date", _rows[_i].get("date",""))
+                                    _rows[_i]["vendor_clean"] = st.session_state.get(f"td_{_i}_name", _rows[_i].get("vendor_clean",""))
+                                    _rows[_i]["name"]         = _rows[_i].get("name", _rows[_i]["vendor_clean"])
+                                    _rows[_i]["amount"]       = st.session_state.get(f"td_{_i}_amt",  _rows[_i].get("amount", 0))
+                                    _rows[_i]["category"]     = st.session_state.get(f"td_{_i}_cat",  _rows[_i].get("category","Unknown"))
+                                save_data = []
+                                for row in _rows:
+                                    try:
+                                        amt = float(str(row.get("amount", 0)).replace("$","").replace(",","").strip() or 0)
+                                    except (ValueError, TypeError):
+                                        amt = 0.0
+                                    vc = row.get("vendor_clean") or ""
+                                    if str(vc).lower() in ("nan", "none", ""):
+                                        vc = row.get("name", "")
+                                    save_data.append({
+                                        "date":         str(row.get("date", "")),
+                                        "name":         str(row.get("name", "") or ""),
+                                        "vendor_clean": str(vc),
+                                        "amount":       amt,
+                                        "category":     str(row.get("category", "Unknown")),
+                                    })
+                                from db import get_profile as _gp
+                                _profile  = _gp(uid)
+                                _tier     = _profile.get("subscription_tier", "free_trial")
+                                _tier_req = "free" if _tier == "free_trial" else _tier
+                                ok, err = save_report(
+                                    uid, report_label.strip(), ps_str, pe_str,
+                                    save_data, tier_required=_tier_req,
+                                    ai_insight=st.session_state.get("_insight_to_save"),
+                                )
+                                if ok:
+                                    st.success("✅ Saved!")
+                                else:
+                                    st.error(f"Could not save: {err}")
+                    st.markdown("</div>", unsafe_allow_html=True)
+
         # ── Sentinel: inline add-new-category UI ─────────────────────────────
         if new_cats_needed:
             st.markdown('<div class="info-box blue">You selected <b>＋ Add new category…</b> — '
@@ -1307,159 +1360,24 @@ Top vendors: {_top_v}"""
                         else:
                             st.error(f"Could not save: {err}")
 
-        # ── Manage categories expander ────────────────────────────────────────
-        with st.expander("⚙️ Manage categories"):
-            custom = {k: v for k, v in all_cats.items() if k not in DEFAULT_CATEGORY_COLORS}
-            if custom:
-                st.markdown("**Your custom categories**")
-                for cname, ccolor in custom.items():
-                    cc1, cc2 = st.columns([4, 1])
-                    with cc1:
-                        st.markdown(
-                            f'<span style="display:inline-block;width:12px;height:12px;'
-                            f'border-radius:50%;background:{ccolor};margin-right:8px;'
-                            f'vertical-align:middle"></span>{cname}',
-                            unsafe_allow_html=True,
-                        )
-                    with cc2:
-                        if st.button("✕", key=f"del_cat_{cname}"):
-                            delete_category(uid, cname)
-                            st.rerun()
-            else:
-                st.caption("No custom categories yet — select '＋ Add new category…' in the table above to create one.")
+        # ── Settings hint ─────────────────────────────────────────────────────
+        if vendor_rule_queue:
+            st.markdown(
+                f'<div class="info-box green">✅ {len(vendor_rule_queue)} vendor rule'
+                f'{"s" if len(vendor_rule_queue)!=1 else ""} saved automatically. '
+                f'Manage your categories and vendor rules in '
+                f'<a href="/6_settings" target="_self" style="color:#34d399">Settings</a>.</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                "<p style='font-size:.8rem;color:#444;margin:8px 0'>💡 Categories and vendor rules "
+                "can be managed in "
+                "<a href='/6_settings' target='_self' style='color:#555'>Settings</a>.</p>",
+                unsafe_allow_html=True,
+            )
 
-        # ── Vendor rules expander ─────────────────────────────────────────────
-        with st.expander("🏪 Vendor auto-categorization rules"):
-            # Show auto-created rules notice if any were just created
-            if vendor_rule_queue:
-                st.markdown(
-                    f'<div class="info-box green">✅ {len(vendor_rule_queue)} vendor rule'
-                    f'{"s" if len(vendor_rule_queue)!=1 else ""} saved automatically.</div>',
-                    unsafe_allow_html=True,
-                )
 
-            st.caption("Rules are created automatically when you change a category in the table. "
-                       "You can also add or delete them manually here.")
-
-            # Manual add
-            vr1, vr2, vr3, vr4 = st.columns([3, 2, 2, 1])
-            with vr1:
-                new_vr_vendor = st.text_input("Vendor", placeholder="e.g. AMPOL",
-                                              label_visibility="collapsed", key="new_vr_vendor")
-            with vr2:
-                new_vr_cat = st.selectbox("Category", cat_names,
-                                          label_visibility="collapsed", key="new_vr_cat")
-            with vr3:
-                new_vr_type = st.selectbox("Match type", ["contains", "exact"],
-                                           label_visibility="collapsed", key="new_vr_type")
-            with vr4:
-                if st.button("Add", use_container_width=True, key="add_vr"):
-                    vendor = new_vr_vendor.strip()
-                    if not vendor:
-                        st.warning("Enter a vendor name.")
-                    elif not uid:
-                        st.warning("Sign in to save rules.")
-                    else:
-                        ok, err = save_vendor_rule(uid, vendor, new_vr_cat, new_vr_type)
-                        if ok:
-                            st.success(f"Rule saved: {vendor} → {new_vr_cat}")
-                            st.rerun()
-                        else:
-                            st.error(f"Could not save: {err}")
-
-            # List existing rules
-            v_rules_fresh = load_vendor_rules(uid) if uid else []
-            if v_rules_fresh:
-                st.markdown("**Active rules**")
-                for rule in v_rules_fresh:
-                    rc1, rc2 = st.columns([5, 1])
-                    with rc1:
-                        st.markdown(
-                            f'`{rule["vendor_name"]}` ({rule["match_type"]}) → '
-                            f'**{rule["category"]}**'
-                        )
-                    with rc2:
-                        if st.button("✕", key=f"del_vr_{rule['vendor_name']}"):
-                            delete_vendor_rule(uid, rule["vendor_name"])
-                            st.rerun()
-            else:
-                st.caption("No rules yet.")
-
-        # ── Save report ───────────────────────────────────────────────────────
-        with st.expander("💾 Save this report to your account"):
-            if not uid:
-                st.info("Sign in to save reports.")
-            else:
-                sr1, sr2, sr3 = st.columns([3, 2, 2])
-                with sr1:
-                    report_label = st.text_input("Label", placeholder="e.g. March 2026",
-                                                 label_visibility="collapsed", key="report_label")
-                with sr2:
-                    period_start = st.date_input("Period start", value=None,
-                                                 label_visibility="collapsed", key="period_start")
-                with sr3:
-                    period_end = st.date_input("Period end", value=None,
-                                               label_visibility="collapsed", key="period_end")
-
-                # Duplicate warning
-                ps_str = str(period_start) if period_start else None
-                pe_str = str(period_end)   if period_end   else None
-                if ps_str and pe_str and check_duplicate_report(uid, ps_str, pe_str):
-                    st.warning(
-                        "⚠️ A saved report already overlaps this date range. "
-                        "You can still save but check you're not duplicating data."
-                    )
-
-                if st.button("💾 Save report", type="primary", use_container_width=True):
-                    if not report_label.strip():
-                        st.warning("Enter a label for this report.")
-                    else:
-                        # Sync latest widget state into tx_rows before saving
-                        _rows = st.session_state.get("tx_rows", [])
-                        for _i in range(len(_rows)):
-                            _rows[_i]["date"]         = st.session_state.get(f"td_{_i}_date",     _rows[_i].get("date",""))
-                            _rows[_i]["vendor_clean"] = st.session_state.get(f"td_{_i}_name",     _rows[_i].get("vendor_clean",""))
-                            _rows[_i]["name"]         = _rows[_i].get("name", _rows[_i]["vendor_clean"])
-                            _rows[_i]["amount"]       = st.session_state.get(f"td_{_i}_amt",      _rows[_i].get("amount", 0))
-                            _rows[_i]["category"]     = st.session_state.get(f"td_{_i}_cat",      _rows[_i].get("category","Unknown"))
-
-                        save_data = []
-                        for row in _rows:
-                            try:
-                                amt = float(str(row.get("amount", 0)).replace("$","").replace(",","").strip() or 0)
-                            except (ValueError, TypeError):
-                                amt = 0.0
-                            vc = row.get("vendor_clean") or ""
-                            if str(vc).lower() in ("nan", "none", ""):
-                                vc = row.get("name", "")
-                            save_data.append({
-                                "date":         str(row.get("date", "")),
-                                "name":         str(row.get("name", "") or ""),
-                                "vendor_clean": str(vc),
-                                "amount":       amt,
-                                "category":     str(row.get("category", "Unknown")),
-                            })
-
-                        # Determine tier_required based on user's subscription
-                        from db import get_profile as _gp
-                        _profile = _gp(uid)
-                        _tier    = _profile.get("subscription_tier", "free_trial")
-                        # Map subscription tier to tier_required value
-                        # free_trial users can save summaries, paid users get line items too
-                        _tier_req = "free" if _tier == "free_trial" else _tier
-
-                        ok, err = save_report(
-                            uid,
-                            report_label.strip(),
-                            ps_str, pe_str,
-                            save_data,
-                            tier_required=_tier_req,
-                            ai_insight=st.session_state.get("_insight_to_save"),
-                        )
-                        if ok:
-                            st.success("✅ Report saved!")
-                        else:
-                            st.error(f"Could not save: {err}")
 
         # ── Downloads ─────────────────────────────────────────────────────────
         st.markdown("---")
