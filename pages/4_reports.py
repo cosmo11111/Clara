@@ -180,14 +180,33 @@ if month_data:
     months_sorted = sorted(month_data.keys())
     all_cats = sorted({cat for m in month_data.values() for cat in m})
 
+    chart_mode = st.radio("Chart display", ["Value ($)", "Percentage (%)"],
+                          horizontal=True, label_visibility="collapsed",
+                          key="chart_mode")
+    show_pct = chart_mode == "Percentage (%)"
+
+    # Compute month totals for percentage mode
+    month_totals = {m: sum(month_data[m].values()) for m in months_sorted}
+
     fig = go.Figure()
     for cat in all_cats:
+        if show_pct:
+            y_vals = [
+                round(month_data[m].get(cat, 0) / month_totals[m] * 100, 1)
+                if month_totals[m] else 0
+                for m in months_sorted
+            ]
+            hover = f"<b>{cat}</b><br>%{{y:.1f}}%<extra></extra>"
+        else:
+            y_vals = [month_data[m].get(cat, 0) for m in months_sorted]
+            hover = f"<b>{cat}</b><br>$%{{y:,.2f}}<extra></extra>"
+
         fig.add_trace(go.Bar(
             name=cat,
             x=months_sorted,
-            y=[month_data[m].get(cat, 0) for m in months_sorted],
+            y=y_vals,
             marker_color=CATEGORY_COLORS.get(cat, "#6b7280"),
-            hovertemplate=f"<b>{cat}</b><br>$%{{y:,.2f}}<extra></extra>",
+            hovertemplate=hover,
         ))
 
     fig.update_layout(
@@ -204,7 +223,12 @@ if month_data:
             xanchor="left", x=0, font=dict(size=10),
         ),
         xaxis=dict(gridcolor="#1e1e28", tickfont=dict(size=10), linecolor="#2a2a38"),
-        yaxis=dict(gridcolor="#1e1e28", tickprefix="$", tickfont=dict(size=10)),
+        yaxis=dict(
+            gridcolor="#1e1e28", tickfont=dict(size=10),
+            ticksuffix="%" if show_pct else "",
+            tickprefix="" if show_pct else "$",
+            range=[0, 100] if show_pct else None,
+        ),
     )
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
     st.markdown("---")
@@ -284,11 +308,12 @@ for report in reports:
                                 background:{display_color}"></div>
                   </div>
                 </div>"""
-            st.markdown(f"""
-            <p style="font-size:.75rem;color:#555;text-transform:uppercase;
-                      letter-spacing:.06em;margin:0 0 6px">Top vendors</p>
-            {vendor_html}
-            """, unsafe_allow_html=True)
+            st.markdown(
+                "<p style='font-size:.75rem;color:#555;text-transform:uppercase;"
+                "letter-spacing:.06em;margin:0 0 6px'>Top vendors</p>",
+                unsafe_allow_html=True
+            )
+            st.markdown(vendor_html, unsafe_allow_html=True)
 
         # View full report + Delete
         st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
