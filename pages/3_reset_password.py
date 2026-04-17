@@ -20,20 +20,6 @@ if is_logged_in():
 
 params = st.query_params
 
-# ── DEBUG — shows exactly what Supabase sent back ─────────────────────────────
-# Remove this block once password reset is confirmed working
-with st.expander("🐛 Debug info (remove before launch)", expanded=True):
-    st.write("**All query params received:**", dict(params))
-    st.write("**Keys present:**", list(params.keys()))
-    st.write("**'code' present:**", "code" in params)
-    st.write("**'token' present:**", "token" in params)
-    st.write("**'type' present:**", "type" in params)
-    if "code" in params:
-        st.write("**code value (first 20 chars):**", str(params["code"])[:20] + "...")
-    if "type" in params:
-        st.write("**type value:**", params["type"])
-    st.caption("This tells us exactly what Supabase is sending and whether Streamlit is receiving it.")
-
 # ── Detect mode ────────────────────────────────────────────────────────────────
 # Supabase PKCE flow sends ?code=...
 # Supabase magic link sends #access_token=... (fragment — Streamlit can't read)
