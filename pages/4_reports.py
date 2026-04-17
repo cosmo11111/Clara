@@ -193,6 +193,7 @@ if month_data:
     fig.update_layout(
         barmode="stack",
         height=280,
+        bargap=0.6,
         margin=dict(l=0, r=0, t=10, b=10),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
@@ -268,6 +269,8 @@ for report in reports:
                 vcat    = v.get("category", "Unknown")
                 bar_pct = int(vamt / max_amt * 100)
                 color   = CATEGORY_COLORS.get(vcat, "#6b7280")
+                # Use a non-grey fallback for uncategorised vendors
+                display_color = color if color != "#6b7280" else "#888"
                 vendor_html += f"""
                 <div style="padding:8px 0;border-bottom:1px solid #1e1e28">
                   <div style="display:flex;justify-content:space-between;
@@ -278,7 +281,7 @@ for report in reports:
                   </div>
                   <div style="background:#1e1e28;border-radius:3px;height:3px">
                     <div style="width:{bar_pct}%;height:3px;border-radius:3px;
-                                background:{color}"></div>
+                                background:{display_color}"></div>
                   </div>
                 </div>"""
             st.markdown(f"""
