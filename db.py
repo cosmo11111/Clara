@@ -17,6 +17,44 @@ def _uid(user) -> str | None:
 # ═══════════════════════════════════════════════════════════
 # CUSTOM CATEGORIES
 # ═══════════════════════════════════════════════════════════
+# ── Encryption helpers ────────────────────────────────────────────────────────
+# Encrypts sensitive line_item fields (vendor_name, vendor_name_clean, amount)
+# before writing to Supabase. Decrypts on read. Key stored in Streamlit secrets.
+# If no key is configured, data is stored in plaintext (graceful fallback).
+
+def _get_cipher():
+    """Return a Fernet cipher from ENCRYPTION_KEY secret, or None if not set."""
+    try:
+        from cryptography.fernet import Fernet
+        key = st.secrets.get("ENCRYPTION_KEY", "")
+        if not key:
+            return None
+        return Fernet(key.encode() if isinstance(key, str) else key)
+    except Exception:
+        return None
+
+
+def _encrypt(value: str | float | None, cipher) -> str | None:
+    """Encrypt a value to a base64 string. Returns None if value is None."""
+    if value is None or cipher is None:
+        return str(value) if value is not None else None
+    try:
+        return cipher.encrypt(str(value).encode()).decode()
+    except Exception:
+        return str(value)
+
+
+def _decrypt(value: str | None, cipher) -> str | None:
+    """Decrypt a base64 string back to plaintext. Returns value as-is if not encrypted."""
+    if value is None or cipher is None:
+        return value
+    try:
+        return cipher.decrypt(value.encode()).decode()
+    except Exception:
+        # Not encrypted (legacy data) — return as-is
+        return value
+
+
 DEFAULT_CATEGORY_COLORS = {
     "Food & Dining":  "#f59e0b",
     "Transport":      "#60a5fa",
@@ -361,20 +399,22 @@ def save_report(user_id: str, label: str,
 
         report_id = report_res.data[0]["id"]
 
-        # ── Insert line items (starter+ only) ────────────────────────────────
+        # ── Insert line items (starter+ only, encrypted) ─────────────────────
         if tier_required in ("starter", "unlimited"):
-            items = []
+            cipher = _get_cipher()
+            items  = []
             for t in transactions:
                 raw_name    = t.get("name", "") or ""
                 clean_name  = t.get("vendor_clean", "") or raw_name
                 is_redacted = raw_name.strip().lower() in ("", "unknown")
+                amt         = round(float(t["amount"]), 2)
                 items.append({
                     "report_id":         report_id,
                     "user_id":           user_id,
                     "date":              str(t.get("date", "")),
-                    "vendor_name":       raw_name    if not is_redacted else None,
-                    "vendor_name_clean": clean_name  if not is_redacted else None,
-                    "amount":            round(float(t["amount"]), 2),
+                    "vendor_name":       _encrypt(raw_name,   cipher) if not is_redacted else None,
+                    "vendor_name_clean": _encrypt(clean_name, cipher) if not is_redacted else None,
+                    "amount":            _encrypt(amt,        cipher),
                     "category":          t.get("category", "Unknown"),
                     "is_redacted":       is_redacted,
                 })
@@ -389,11 +429,22 @@ def save_report(user_id: str, label: str,
 
 
 def load_report_items(report_id: str) -> list[dict]:
-    """Load line items for a specific saved report."""
+    """Load and decrypt line items for a specific saved report."""
     try:
         sb  = get_supabase()
         res = sb.table("line_items")                 .select("date, vendor_name, vendor_name_clean, amount, category, is_redacted")                 .eq("report_id", report_id)                 .order("created_at")                 .execute()
-        return res.data or []
+        rows   = res.data or []
+        cipher = _get_cipher()
+        for row in rows:
+            row["vendor_name"]       = _decrypt(row.get("vendor_name"),       cipher)
+            row["vendor_name_clean"] = _decrypt(row.get("vendor_name_clean"), cipher)
+            # amount stored as encrypted string — decrypt then convert back to float
+            raw_amt = _decrypt(row.get("amount"), cipher)
+            try:
+                row["amount"] = float(raw_amt) if raw_amt is not None else 0.0
+            except (ValueError, TypeError):
+                row["amount"] = 0.0
+        return rows
     except Exception:
         return []
 
