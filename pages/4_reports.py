@@ -283,6 +283,17 @@ for report in reports:
         </div>
         """, unsafe_allow_html=True)
 
+        # AI insight if saved
+        ai_insight = report.get("ai_insight")
+        if ai_insight:
+            st.markdown(f"""
+            <div style="background:#0f0f13;border-radius:8px;padding:12px 14px;margin-bottom:16px">
+              <p style="font-size:.7rem;font-weight:600;color:#f0c040;text-transform:uppercase;
+                        letter-spacing:.08em;margin:0 0 6px">✦ AI Insight</p>
+              <p style="font-size:.85rem;color:#c9c7c0;line-height:1.6;margin:0">{ai_insight}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
         # Top 3 vendors
         if top_vendors:
             max_amt = max(v.get("amount", 0) for v in top_vendors) or 1
