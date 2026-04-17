@@ -41,7 +41,7 @@ if mode == "request":
     Reset your password
   </div>
   <div style="font-size:.85rem;color:#666">
-    We'll email you a 6-digit code
+    We'll email you a reset code
   </div>
 </div>""", unsafe_allow_html=True)
 
@@ -81,14 +81,13 @@ if mode == "request":
             saved_email = st.session_state.get("reset_email", "")
             st.markdown(
                 f"<p style='color:#888;font-size:.85rem;margin-bottom:8px'>"
-                f"Enter the 6-digit code sent to "
+                f"Enter the reset code sent to "
                 f"<b style='color:#e8e6e1'>{saved_email}</b></p>",
                 unsafe_allow_html=True,
             )
             with st.form("code_form", border=False):
-                code_input = st.text_input("6-digit code",
-                                           placeholder="123456",
-                                           max_chars=6)
+                code_input = st.text_input("Reset code",
+                                           placeholder="Paste the code from your email")
                 submitted = st.form_submit_button("Verify code",
                                                    use_container_width=True)
             if submitted:
