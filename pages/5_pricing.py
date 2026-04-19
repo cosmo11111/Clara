@@ -2,47 +2,47 @@ import streamlit as st
 from auth import require_auth, get_user, get_supabase, clear_session
 from db import get_profile, TIER_LABELS, upgrade_user
 
-st.set_page_config(page_title="Pricing — Categoriz", page_icon="💳", layout="centered")
+st.set_page_config(page_title="Pricing — Clara", page_icon="💳", layout="centered")
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
-html, body, .stApp { font-family:'DM Sans',sans-serif; background:#0f0f13; color:#e8e6e1; }
-section[data-testid="stSidebar"] { background:#17171d !important; border-right:1px solid #2a2a35; }
-section[data-testid="stSidebar"] * { color:#c9c7c0 !important; }
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+html, body, .stApp { font-family:'DM Sans',sans-serif; background:#0b0b12; color:#F2EEE6; }
+section[data-testid="stSidebar"] { background:#0f0f18 !important; border-right:0.5px solid #1c1c28; }
+section[data-testid="stSidebar"] * { color:#c8c5bf !important; }
 #MainMenu { visibility:hidden; } footer { visibility:hidden; }
 .stButton button { border-radius:8px !important; font-weight:500 !important; transition:all .15s !important; }
-.stButton button[kind="primary"] { background:#f0c040 !important; color:#0f0f13 !important; border:none !important; }
+.stButton button[kind="primary"] { background:#F5B731 !important; color:#0f0f13 !important; border:none !important; }
 
 .pricing-card {
-    background:#1a1a24; border:1px solid #2a2a38; border-radius:16px;
+    background:#171720; border:0.5px solid #1c1c28; border-radius:16px;
     padding:28px 24px; margin-bottom:8px;
 }
 .pricing-card.featured {
-    border-color:#f0c040; position:relative;
+    border-color:#F5B731; position:relative;
 }
 .badge {
-    display:inline-block; background:#f0c040; color:#0f0f13;
+    display:inline-block; background:#F5B731; color:#0f0f13;
     font-size:11px; font-weight:600; padding:3px 10px;
     border-radius:20px; margin-bottom:12px;
     letter-spacing:.04em; text-transform:uppercase;
 }
 .price-amount {
-    font-size:2.2rem; font-weight:600; color:#e8e6e1;
-    font-family:'DM Mono',monospace; line-height:1;
+    font-size:2.2rem; font-weight:600; color:#F2EEE6;
+    font-family:'DM Sans',sans-serif;font-weight:300; line-height:1;
 }
 .price-period { font-size:.85rem; color:#666; margin-left:4px; }
-.feature { font-size:.88rem; color:#c9c7c0; padding:5px 0;
-           border-bottom:1px solid #1e1e28; }
+.feature { font-size:.88rem; color:#c8c5bf; padding:5px 0;
+           border-bottom:0.5px solid #1c1c28; }
 .feature:last-child { border-bottom:none; }
-.feature-tick { color:#f0c040; margin-right:8px; }
+.feature-tick { color:#F5B731; margin-right:8px; }
 .current-badge {
-    display:inline-block; background:#2a2a38; color:#888;
+    display:inline-block; background:#252535; color:#888;
     font-size:11px; padding:3px 10px; border-radius:20px;
     margin-bottom:12px;
 }
-.usage-bar-bg { background:#1e1e28; border-radius:4px; height:6px; margin:8px 0; }
-.usage-bar { background:#f0c040; border-radius:4px; height:6px; transition:width .3s; }
+.usage-bar-bg { background:#171720; border-radius:4px; height:6px; margin:8px 0; }
+.usage-bar { background:#F5B731; border-radius:4px; height:6px; transition:width .3s; }
   [data-testid="stSidebarNav"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -66,7 +66,7 @@ with st.sidebar:
 with st.sidebar.container(key="sidebar_bottom"):
     st.markdown(f"<p style='color:#888;font-size:.8rem;margin-bottom:2px'>Signed in as</p>",
                 unsafe_allow_html=True)
-    st.markdown(f"<p style='color:#e8e6e1;font-size:.85rem;font-weight:500;"
+    st.markdown(f"<p style='color:#F2EEE6;font-size:.85rem;font-weight:500;"
                 f"word-break:break-all;margin-bottom:8px'>{email}</p>",
                 unsafe_allow_html=True)
     if st.button("Sign out", use_container_width=True):
@@ -155,7 +155,7 @@ st.markdown("<p style='color:#666;margin-top:-8px'>Simple pricing, cancel anytim
 if tier == "free_trial":
     pct = min(used / 3 * 100, 100)
     st.markdown(f"""
-    <div style="background:#1a1a24;border:1px solid #2a2a38;border-radius:10px;
+    <div style="background:#171720;border:0.5px solid #1c1c28;border-radius:10px;
                 padding:14px 18px;margin-bottom:20px">
       <p style="margin:0 0 6px;font-size:.85rem;color:#888">
         Free trial &nbsp;·&nbsp; {used} of 3 lifetime analyses used
@@ -168,7 +168,7 @@ if tier == "free_trial":
 elif tier == "starter":
     pct = min(used / limit * 100, 100)
     st.markdown(f"""
-    <div style="background:#1a1a24;border:1px solid #2a2a38;border-radius:10px;
+    <div style="background:#171720;border:0.5px solid #1c1c28;border-radius:10px;
                 padding:14px 18px;margin-bottom:20px">
       <p style="margin:0 0 6px;font-size:.85rem;color:#888">
         Starter plan &nbsp;·&nbsp; {used} of {limit} analyses used this month
@@ -180,9 +180,9 @@ elif tier == "starter":
     """, unsafe_allow_html=True)
 elif tier == "unlimited":
     st.markdown("""
-    <div style="background:#1a1a24;border:1px solid #f0c040;border-radius:10px;
+    <div style="background:#171720;border:0.5px solid #F5B731;border-radius:10px;
                 padding:14px 18px;margin-bottom:20px">
-      <p style="margin:0;font-size:.85rem;color:#f0c040">
+      <p style="margin:0;font-size:.85rem;color:#F5B731">
         ✓ You're on the Unlimited plan — no limits on analyses.
       </p>
     </div>
@@ -196,7 +196,7 @@ with col1:
     st.markdown(f"""
     <div class="pricing-card">
       {'<div class="current-badge">Current plan</div>' if is_current else '<div style="height:24px"></div>'}
-      <div style="font-size:1rem;font-weight:600;color:#e8e6e1;margin-bottom:6px">Free trial</div>
+      <div style="font-size:1rem;font-weight:600;color:#F2EEE6;margin-bottom:6px">Free trial</div>
       <div style="margin-bottom:16px">
         <span class="price-amount">$0</span>
       </div>
@@ -217,7 +217,7 @@ with col2:
     st.markdown(f"""
     <div class="pricing-card {'featured' if not is_current else ''}">
       {'<div class="badge">Most popular</div>' if not is_current else '<div class="current-badge">Current plan</div>'}
-      <div style="font-size:1rem;font-weight:600;color:#e8e6e1;margin-bottom:6px">Starter</div>
+      <div style="font-size:1rem;font-weight:600;color:#F2EEE6;margin-bottom:6px">Starter</div>
       <div style="margin-bottom:16px">
         <span class="price-amount">$9</span>
         <span class="price-period">/month</span>
@@ -246,7 +246,7 @@ with col3:
     st.markdown(f"""
     <div class="pricing-card">
       {'<div class="current-badge">Current plan</div>' if is_current else '<div style="height:24px"></div>'}
-      <div style="font-size:1rem;font-weight:600;color:#e8e6e1;margin-bottom:6px">Unlimited</div>
+      <div style="font-size:1rem;font-weight:600;color:#F2EEE6;margin-bottom:6px">Unlimited</div>
       <div style="margin-bottom:16px">
         <span class="price-amount">$29</span>
         <span class="price-period">/month</span>
