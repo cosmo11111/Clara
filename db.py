@@ -56,23 +56,24 @@ def _decrypt(value: str | None, cipher) -> str | None:
 
 
 DEFAULT_CATEGORY_COLORS = {
-    "Food & Dining":  "#f59e0b",
-    "Transport":      "#60a5fa",
-    "Shopping":       "#a78bfa",
-    "Entertainment":  "#f472b6",
-    "Health":         "#34d399",
-    "Utilities":      "#94a3b8",
-    "Travel":         "#fb923c",
-    "Subscriptions":  "#e879f9",
-    "Income":         "#4ade80",
-    "Housing":        "#f87171",
-    "Transfers":      "#64748b",
-    "Education":      "#38bdf8",
-    "Groceries":      "#fbbf24",
-    "Personal Care":  "#c084fc",
-    "Insurance":      "#a8a29e",
-    "Investments":    "#86efac",
-    "Unknown":        "#6b7280",
+    # Primary categories — brand secondary palette
+    "Food & Dining":  "#D97A6A",  # Warm Coral
+    "Transport":      "#6F8FAF",  # Dusty Blue
+    "Shopping":       "#8D7AA8",  # Lavender
+    "Health":         "#7FA58A",  # Sage
+    "Utilities":      "#8C8F9A",  # Cool Grey
+    "Subscriptions":  "#9D8AB8",  # Lavender lighter
+    "Travel":         "#C4694A",  # Warm Coral deeper
+    "Entertainment":  "#B87898",  # Muted pink
+    "Housing":        "#4A6A8F",  # Dusty Blue deeper
+    "Groceries":      "#C49040",  # Warm amber
+    "Education":      "#5A8A9F",  # Dusty teal
+    "Personal Care":  "#A07898",  # Dusty mauve
+    "Insurance":      "#7A8A8A",  # Muted teal-grey
+    "Investments":    "#5A8A6A",  # Sage deeper
+    "Transfers":      "#6A6D78",  # Cool grey muted
+    "Income":         "#4ade80",  # Keep saturated green
+    "Other":          "#6A6D78",  # Cool Grey muted
 }
 
 
@@ -247,7 +248,7 @@ def _build_monthly_totals(transactions: list[dict]) -> dict:
     # Add parseable transactions to their month bucket
     for d, t in parseable:
         month_key = d.strftime("%Y-%m")
-        cat = t.get("category", "Unknown")
+        cat = t.get("category", "Other")
         amt = abs(float(t["amount"]))
         if month_key not in monthly:
             monthly[month_key] = {}
@@ -262,7 +263,7 @@ def _build_monthly_totals(transactions: list[dict]) -> dict:
             keys = list(monthly.keys())
             per_month_weight = 1 / len(keys)
             for t in unparseable:
-                cat = t.get("category", "Unknown")
+                cat = t.get("category", "Other")
                 amt = abs(float(t["amount"]))
                 for key in keys:
                     if key not in monthly:
@@ -273,7 +274,7 @@ def _build_monthly_totals(transactions: list[dict]) -> dict:
         else:
             monthly["unknown"] = {}
             for t in unparseable:
-                cat = t.get("category", "Unknown")
+                cat = t.get("category", "Other")
                 amt = abs(float(t["amount"]))
                 monthly["unknown"][cat] = round(
                     monthly["unknown"].get(cat, 0) + amt, 2
@@ -308,10 +309,10 @@ def _build_top_vendors(transactions: list[dict], n: int = 3) -> list[dict]:
         amt = abs(float(t["amount"]))
         vendor_spend[clean] = round(vendor_spend.get(clean, 0) + amt, 2)
         if clean not in vendor_cat:
-            vendor_cat[clean] = t.get("category", "Unknown")
+            vendor_cat[clean] = t.get("category", "Other")
 
     top = sorted(vendor_spend.items(), key=lambda x: x[1], reverse=True)[:n]
-    return [{"vendor": v, "amount": a, "category": vendor_cat.get(v, "Unknown")}
+    return [{"vendor": v, "amount": a, "category": vendor_cat.get(v, "Other")}
             for v, a in top]
 
 
@@ -373,7 +374,7 @@ def save_report(user_id: str, label: str,
         cat_totals     = {}
         for t in transactions:
             if float(t.get("amount", 0)) < 0:
-                cat = t.get("category", "Unknown")
+                cat = t.get("category", "Other")
                 cat_totals[cat] = round(
                     cat_totals.get(cat, 0) + abs(float(t["amount"])), 2
                 )
@@ -415,7 +416,7 @@ def save_report(user_id: str, label: str,
                     "vendor_name":       _encrypt(raw_name,   cipher) if not is_redacted else None,
                     "vendor_name_clean": _encrypt(clean_name, cipher) if not is_redacted else None,
                     "amount":            _encrypt(amt,        cipher),
-                    "category":          t.get("category", "Unknown"),
+                    "category":          t.get("category", "Other"),
                     "is_redacted":       is_redacted,
                 })
             if items:
