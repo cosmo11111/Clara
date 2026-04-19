@@ -344,7 +344,7 @@ def make_figure(b64, img_w, img_h, annotations, pending, zm):
 
 def categorize_with_gemini(text, all_categories: dict, vendor_rules: list):
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.5-flash-preview-04-17")
+    model = genai.GenerativeModel("gemini-3-flash-preview")
     cat_list = ", ".join(all_categories.keys())
     prompt = f"""Extract ALL transactions from this bank statement text.
 Return ONLY a JSON array. Each object must have exactly these keys:
@@ -1063,7 +1063,7 @@ elif st.session_state.step == 3:
                 try:
                     import google.generativeai as _genai
                     _genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                    _imodel = _genai.GenerativeModel("gemini-2.5-flash-preview-04-17")
+                    _imodel = _genai.GenerativeModel("gemini-3-flash-preview")
                     _iprompt = f"""You are a personal finance assistant. Given this spending summary, provide 1-2 sentences of genuinely useful insight. Focus on something specific and interesting — a pattern, a standout category, a vendor worth noticing, or a spend/income relationship. Be conversational and non-judgmental. Do not restate obvious totals. Do not use the word "great".
 
 Total spend: ${abs(total_spend):,.2f}
