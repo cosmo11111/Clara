@@ -1,20 +1,20 @@
 import streamlit as st
 from auth import get_supabase, set_session, is_logged_in, AUTH_CSS
 
-st.set_page_config(page_title="Login — Expense AI", page_icon="💳", layout="centered")
+st.set_page_config(page_title="Login — Clara", page_icon="💳", layout="centered")
 st.markdown(AUTH_CSS, unsafe_allow_html=True)
 st.markdown("""
 <style>
 /* Make form submit button yellow with black text */
 div[data-testid="stFormSubmitButton"] button {
-    background-color: #f0c040 !important;
-    color: #0f0f13 !important;
+    background-color: #F5B731 !important;
+    color: #0b0b12 !important;
     border: none !important;
     font-weight: 600 !important;
     width: 100% !important;
 }
 div[data-testid="stFormSubmitButton"] button:hover {
-    background-color: #e0b030 !important;
+    background-color: #e8aa2a !important;
 }
 /* Hide Enter to submit hint */
 [data-testid="InputInstructions"] { display: none !important; }
@@ -27,9 +27,9 @@ if is_logged_in():
 
 st.markdown("""
 <div style="text-align:center;padding:48px 0 24px">
-  <div style="font-family:'DM Sans',sans-serif;font-size:2.4rem;font-weight:700;
-              font-style:italic;color:#f0c040;letter-spacing:.04em;margin-bottom:8px">
-    CATEGORIZ
+  <div style="font-family:'DM Serif Display',serif;font-style:italic;font-size:3rem;
+              color:#F5B731;letter-spacing:-.01em;margin-bottom:8px">
+    Clara
   </div>
   <div style="font-size:1.1rem;font-weight:500;color:#e8e6e1;margin-bottom:4px">
     Welcome back
