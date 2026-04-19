@@ -55,65 +55,35 @@ def require_auth():
 # ── Shared CSS ────────────────────────────────────────────────────────────────
 AUTH_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
 
 html, body, .stApp {
     font-family: 'DM Sans', sans-serif;
-    background-color: #0f0f13;
-    color: #e8e6e1;
+    background-color: #0b0b12;
+    color: #F2EEE6;
 }
 
-/* Hide default Streamlit nav/hamburger on auth pages */
 [data-testid="stSidebarNav"] { display: none; }
 section[data-testid="stSidebar"] { display: none; }
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
-
-.auth-card {
-    max-width: 420px;
-    margin: 60px auto 0;
-    background: #1a1a24;
-    border: 1px solid #2a2a38;
-    border-radius: 16px;
-    padding: 40px 36px;
-}
-
-.auth-logo {
-    text-align: center;
-    font-size: 2rem;
-    margin-bottom: 4px;
-}
-
-.auth-title {
-    text-align: center;
-    font-size: 1.4rem;
-    font-weight: 600;
-    color: #e8e6e1;
-    margin-bottom: 4px;
-}
-
-.auth-subtitle {
-    text-align: center;
-    font-size: 0.85rem;
-    color: #666;
-    margin-bottom: 28px;
-}
+[data-testid="stHeader"] { display: none !important; }
 
 .auth-divider {
     border: none;
-    border-top: 1px solid #2a2a38;
+    border-top: 0.5px solid #1c1c28;
     margin: 20px 0;
 }
 
 .auth-link {
     text-align: center;
     font-size: 0.85rem;
-    color: #666;
+    color: #555;
     margin-top: 16px;
 }
 
 .auth-link a {
-    color: #f0c040;
+    color: #F5B731;
     text-decoration: none;
     font-weight: 500;
 }
@@ -121,50 +91,49 @@ footer { visibility: hidden; }
 .auth-link a:hover { text-decoration: underline; }
 
 .auth-error {
-    background: #1f0f0f;
-    border-left: 3px solid #f87171;
+    background: #1a0f0f;
+    border-left: 3px solid #9e4a4a;
     border-radius: 6px;
     padding: 10px 14px;
     font-size: 0.85rem;
-    color: #f87171;
+    color: #c07070;
     margin-bottom: 16px;
 }
 
 .auth-success {
-    background: #0f1f1a;
-    border-left: 3px solid #34d399;
+    background: #0f1a14;
+    border-left: 3px solid #2e8f66;
     border-radius: 6px;
     padding: 10px 14px;
     font-size: 0.85rem;
-    color: #34d399;
+    color: #2e8f66;
     margin-bottom: 16px;
 }
 
-/* Style Streamlit inputs on auth pages */
 .stTextInput input {
-    background: #0f0f13 !important;
-    border: 1px solid #2a2a38 !important;
+    background: #0b0b12 !important;
+    border: 0.5px solid #252535 !important;
     border-radius: 8px !important;
-    color: #e8e6e1 !important;
+    color: #F2EEE6 !important;
     padding: 10px 14px !important;
 }
 .stTextInput input:focus {
-    border-color: #f0c040 !important;
-    box-shadow: 0 0 0 2px rgba(240,192,64,0.15) !important;
+    border-color: #F5B731 !important;
+    box-shadow: 0 0 0 2px rgba(245,183,49,0.12) !important;
 }
 
 .stButton button {
     width: 100%;
-    background: #f0c040 !important;
-    color: #0f0f13 !important;
+    background: #F5B731 !important;
+    color: #0b0b12 !important;
     border: none !important;
     border-radius: 8px !important;
     padding: 10px !important;
-    font-weight: 600 !important;
+    font-weight: 500 !important;
     font-size: 0.95rem !important;
     cursor: pointer !important;
-    transition: background .15s !important;
+    transition: opacity .15s !important;
 }
-.stButton button:hover { background: #e5b830 !important; }
+.stButton button:hover { opacity: 0.88 !important; }
 </style>
 """
