@@ -223,7 +223,7 @@ COLORS_FILL = {
 DEMO_DATA = [
     {"date": "01 Apr 2026", "name": "DANG GOOD CAFE",                "vendor_clean": "Dang Good Cafe",    "amount": -4.55,    "category": "Food & Dining"},
     {"date": "01 Apr 2026", "name": "STOMPING GROUND BREWIN",        "vendor_clean": "Stomping Ground",   "amount": -22.37,   "category": "Food & Dining"},
-    {"date": "01 Apr 2026", "name": "Unknown",                       "vendor_clean": None,                "amount": -13.00,   "category": "Unknown"},
+    {"date": "01 Apr 2026", "name": "Unknown",                       "vendor_clean": None,                "amount": -13.00,   "category": "Other"},
     {"date": "02 Apr 2026", "name": "AMPOL KEW 33261F",              "vendor_clean": "Ampol",             "amount": -58.77,   "category": "Transport"},
     {"date": "03 Apr 2026", "name": "WOOLWORTHS/18 WALPOLE ST",      "vendor_clean": "Woolworths",        "amount": -7.90,    "category": "Shopping"},
     {"date": "04 Apr 2026", "name": "AMPOL KEW 33261F",              "vendor_clean": "Ampol",             "amount": -2.00,    "category": "Transport"},
@@ -234,8 +234,8 @@ DEMO_DATA = [
     {"date": "07 Apr 2026", "name": "AMPOL KEW 33261F",              "vendor_clean": "Ampol",             "amount": -64.52,   "category": "Transport"},
     {"date": "07 Apr 2026", "name": "ZLR*Seven Creeks Hotel",        "vendor_clean": "Seven Creeks Hotel","amount": -25.08,   "category": "Food & Dining"},
     {"date": "07 Apr 2026", "name": "Transfer from Savings Maximiser","vendor_clean": "Transfer",         "amount": 3000.00,  "category": "Income"},
-    {"date": "07 Apr 2026", "name": "Unknown",                       "vendor_clean": None,                "amount": -2450.00, "category": "Unknown"},
-    {"date": "07 Apr 2026", "name": "Unknown",                       "vendor_clean": None,                "amount": -400.00,  "category": "Unknown"},
+    {"date": "07 Apr 2026", "name": "Unknown",                       "vendor_clean": None,                "amount": -2450.00, "category": "Other"},
+    {"date": "07 Apr 2026", "name": "Unknown",                       "vendor_clean": None,                "amount": -400.00,  "category": "Other"},
     {"date": "08 Apr 2026", "name": "AMPOL TALLAROOK 30026F",        "vendor_clean": "Ampol",             "amount": -11.00,   "category": "Transport"},
     {"date": "08 Apr 2026", "name": "DANG GOOD CAFE",                "vendor_clean": "Dang Good Cafe",    "amount": -17.60,   "category": "Food & Dining"},
 ]
@@ -355,7 +355,7 @@ Return ONLY a JSON array. Each object must have exactly these keys:
                   For transfers, salary, or transactions with no clear vendor use the raw name as-is.
                   For redacted entries use null.)
 - "amount"       (number, negative=debit/expense, positive=credit/income)
-- "category"     (one of: {cat_list}. Use "Unknown" if unclear.)
+- "category"     (one of: {cat_list}. Use "Other" if unclear.)
 
 Rules:
 - Include every transaction, including income, transfers, and redacted rows.
@@ -880,7 +880,7 @@ elif st.session_state.step == 3:
                 "name":         "",
                 "vendor_clean": "",
                 "amount":       "",
-                "category":     "Unknown",
+                "category":     "Other",
             })
             st.session_state._tx_pending_add = False
             for k in [k for k in st.session_state if k.startswith("td_")]:
@@ -938,7 +938,7 @@ elif st.session_state.step == 3:
                               key=f"td_{i}_amt", placeholder="-0.00 (debit) or +0.00 (income)")
 
             with c_cat:
-                prev_cat = str(row.get("category","Unknown"))
+                prev_cat = str(row.get("category","Other"))
                 if prev_cat not in cat_options:
                     prev_cat = "Unknown"
 
@@ -951,7 +951,7 @@ elif st.session_state.step == 3:
                     if matched and matched in cat_names and matched != prev_cat:
                         # Only auto-apply if the row still has "Unknown" or default —
                         # don't override a category the user has already set manually.
-                        if prev_cat == "Unknown":
+                        if prev_cat == "Other":
                             prev_cat = matched
                             rows[i]["category"] = matched
 
@@ -995,7 +995,7 @@ elif st.session_state.step == 3:
                 _rows[_i]["vendor_clean"] = st.session_state.get(f"td_{_i}_name", _rows[_i].get("vendor_clean",""))
                 _rows[_i]["name"]         = _rows[_i].get("name", _rows[_i]["vendor_clean"])
                 _rows[_i]["amount"]       = st.session_state.get(f"td_{_i}_amt",  _rows[_i].get("amount",""))
-                _rows[_i]["category"]     = st.session_state.get(f"td_{_i}_cat",  _rows[_i].get("category","Unknown"))
+                _rows[_i]["category"]     = st.session_state.get(f"td_{_i}_cat",  _rows[_i].get("category","Other"))
             st.session_state.tx_rows = _rows
             st.session_state._charts_dirty = False
 
@@ -1007,7 +1007,7 @@ elif st.session_state.step == 3:
         # ── Always sync rows back (captures add/delete/category changes) ──────
         # Text field edits are only synced when Update Charts is clicked.
         for i in range(len(rows)):
-            rows[i]["category"] = st.session_state.get(f"td_{i}_cat", rows[i].get("category","Unknown"))
+            rows[i]["category"] = st.session_state.get(f"td_{i}_cat", rows[i].get("category","Other"))
         st.session_state.tx_rows = rows
 
         # ── Build df_edited from current tx_rows ─────────────────────────────
@@ -1202,7 +1202,7 @@ Top vendors: {_top_v}"""
                             bar_pct = int(vrow["amount_abs"] / max_val * 100)
                             matched = spend_df[spend_df["vendor"] == vname]["category"].mode()
                             color   = CATEGORY_COLORS.get(
-                                matched.iloc[0] if not matched.empty else "Unknown",
+                                matched.iloc[0] if not matched.empty else "Other",
                                 "#6b7280"
                             )
                             rows_html += f"""
@@ -1236,7 +1236,7 @@ Top vendors: {_top_v}"""
                             bar_pct = int(vrow["charges"] / max_count * 100)
                             matched = spend_df[spend_df["vendor"] == vname]["category"].mode()
                             color   = CATEGORY_COLORS.get(
-                                matched.iloc[0] if not matched.empty else "Unknown",
+                                matched.iloc[0] if not matched.empty else "Other",
                                 "#6b7280"
                             )
                             rows_html += f"""
@@ -1292,7 +1292,7 @@ Top vendors: {_top_v}"""
                                     _rows[_i]["vendor_clean"] = st.session_state.get(f"td_{_i}_name", _rows[_i].get("vendor_clean",""))
                                     _rows[_i]["name"]         = _rows[_i].get("name", _rows[_i]["vendor_clean"])
                                     _rows[_i]["amount"]       = st.session_state.get(f"td_{_i}_amt",  _rows[_i].get("amount", 0))
-                                    _rows[_i]["category"]     = st.session_state.get(f"td_{_i}_cat",  _rows[_i].get("category","Unknown"))
+                                    _rows[_i]["category"]     = st.session_state.get(f"td_{_i}_cat",  _rows[_i].get("category","Other"))
                                 save_data = []
                                 for row in _rows:
                                     try:
@@ -1307,7 +1307,7 @@ Top vendors: {_top_v}"""
                                         "name":         str(row.get("name", "") or ""),
                                         "vendor_clean": str(vc),
                                         "amount":       amt,
-                                        "category":     str(row.get("category", "Unknown")),
+                                        "category":     str(row.get("category", "Other")),
                                     })
                                 from db import get_profile as _gp
                                 _profile  = _gp(uid)
