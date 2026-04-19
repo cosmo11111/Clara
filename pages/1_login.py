@@ -35,7 +35,7 @@ st.markdown("""
     Welcome back
   </div>
   <div style="font-size:.85rem;color:#666">
-    Sign in to your Categoriz account
+    Sign in to your account
   </div>
 </div>
 """, unsafe_allow_html=True)
