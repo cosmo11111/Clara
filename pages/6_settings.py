@@ -106,7 +106,7 @@ st.html("""
 st.markdown("""
 <div style="padding:4px 0 8px">
   <span style="font-family:'DM Sans',sans-serif;font-size:1.2rem;font-weight:700;
-               font-family:'DM Serif Display',serif;font-style:italic;font-size:1.4rem;color:#F5B731;letter-spacing:-.01em">Clara</span>
+               font-family:'DM Serif Display',serif;font-style:italic;font-size:2.8rem;color:#F5B731;letter-spacing:-.01em">Clara</span>
 </div>
 """, unsafe_allow_html=True)
 st.markdown("## Settings")
@@ -198,14 +198,30 @@ with col1:
     </div>
     """, unsafe_allow_html=True)
 
-    if tier != "unlimited":
+    if tier == "free_trial":
         if st.button("⚡ Upgrade plan", key="sub_upgrade_btn",
                      type="primary", use_container_width=True):
             st.switch_page("pages/5_pricing.py")
+    elif tier == "starter":
+        if st.button("⚡ Upgrade to Unlimited", key="sub_upgrade_btn",
+                     type="primary", use_container_width=True):
+            st.switch_page("pages/5_pricing.py")
+        st.markdown(
+            "<p style='font-size:.8rem;color:#444;margin-top:8px'>To cancel or downgrade "
+            "email <a href='mailto:cosmond00@gmail.com' style='color:#555'>"
+            "cosmond00@gmail.com</a></p>",
+            unsafe_allow_html=True
+        )
     else:
         st.markdown(
-            "<p style='font-size:.8rem;color:#555;margin:0'>To cancel or manage billing, "
-            "contact us at cosmond00@gmail.com</p>",
+            "<p style='font-size:.85rem;color:#F5B731;font-weight:500;margin:0 0 6px'>"
+            "✦ Unlimited plan active</p>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "<p style='font-size:.8rem;color:#444;margin:0'>To cancel or downgrade "
+            "email <a href='mailto:cosmond00@gmail.com' style='color:#555'>"
+            "cosmond00@gmail.com</a></p>",
             unsafe_allow_html=True
         )
 
