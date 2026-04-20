@@ -4,7 +4,6 @@ from db import (get_profile, TIER_LABELS, load_categories, save_category, auto_a
                 delete_category, load_vendor_rules, save_vendor_rule,
                 delete_vendor_rule, DEFAULT_CATEGORY_COLORS)
 
-st.set_page_config(page_title="Settings — Clara", page_icon="💳", layout="wide")
 
 st.markdown("""
 <style>
@@ -39,7 +38,6 @@ section[data-testid="stSidebar"] > div { padding-top: 1rem !important; overflow:
 </style>
 """, unsafe_allow_html=True)
 
-require_auth()
 
 user  = get_user()
 uid   = user.id if hasattr(user,"id") else user.get("id") if user else None
@@ -59,7 +57,7 @@ usage_str   = "Unlimited analyses" if tier=="unlimited" else \
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     if st.button("⌂ Home", use_container_width=True):
-        st.switch_page("frontend.py")
+        st.switch_page(st.session_state["_page_home"])
     st.markdown("<div style='padding-top:1rem'>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -79,20 +77,20 @@ with st.sidebar.container(key="sidebar_bottom"):
     """, unsafe_allow_html=True)
     if tier == "free_trial":
         if st.button("⚡ Upgrade plan", use_container_width=True, type="primary"):
-            st.switch_page("pages/5_pricing.py")
+            st.switch_page(st.session_state["_page_pricing"])
     elif tier == "starter":
         if st.button("⚡ Upgrade to Unlimited", use_container_width=True, type="primary"):
-            st.switch_page("pages/5_pricing.py")
+            st.switch_page(st.session_state["_page_pricing"])
     else:
         if st.button("⚡ Manage plan", use_container_width=True, type="primary"):
-            st.switch_page("pages/5_pricing.py")
+            st.switch_page(st.session_state["_page_pricing"])
     if st.button("📂 Saved Reports", use_container_width=True):
-        st.switch_page("pages/4_reports.py")
+        st.switch_page(st.session_state["_page_reports"])
     if st.button("Sign out", use_container_width=True):
         try: get_supabase().auth.sign_out()
         except: pass
         clear_session()
-        st.switch_page("pages/1_login.py")
+        st.switch_page(st.session_state["_page_login"])
 
 st.html("""
 <style>
@@ -104,12 +102,16 @@ st.html("""
 
 # ── Header ─────────────────────────────────────────────────────────────────────
 st.markdown("""
-<div style="padding:4px 0 8px">
-  <span style="font-family:'DM Serif Display',serif;font-style:italic;font-size:2.8rem;color:#F5B731;letter-spacing:-.01em">Clara</span>
+<div style="padding:4px 0 2px">
+  <span style="font-family:'DM Serif Display',serif;font-style:italic;font-size:2.8rem;
+               color:#F5B731;letter-spacing:-.01em">Clara</span>
+</div>
+<div style="font-size:1.4rem;font-weight:500;color:#F2EEE6;margin-bottom:4px">
+  Settings
 </div>
 """, unsafe_allow_html=True)
-st.markdown("## Settings")
-st.markdown("---")
+st.markdown("<hr style='border:none;border-top:0.5px solid #1c1c28;margin:0.5rem 0 1.5rem'>",
+            unsafe_allow_html=True)
 
 col1, col2 = st.columns([1, 1], gap="large")
 
@@ -156,7 +158,7 @@ with col1:
                         sb.table("vendor_rules").delete().eq("user_id", uid).execute()
                         sb.auth.sign_out()
                         clear_session()
-                        st.switch_page("pages/1_login.py")
+                        st.switch_page(st.session_state["_page_login"])
                     except Exception as e:
                         st.error(f"Could not delete account: {e}")
                         st.session_state._confirm_delete = False
@@ -200,11 +202,11 @@ with col1:
     if tier == "free_trial":
         if st.button("⚡ Upgrade plan", key="sub_upgrade_btn",
                      type="primary", use_container_width=True):
-            st.switch_page("pages/5_pricing.py")
+            st.switch_page(st.session_state["_page_pricing"])
     elif tier == "starter":
         if st.button("⚡ Upgrade to Unlimited", key="sub_upgrade_btn",
                      type="primary", use_container_width=True):
-            st.switch_page("pages/5_pricing.py")
+            st.switch_page(st.session_state["_page_pricing"])
         st.markdown(
             "<p style='font-size:.8rem;color:#444;margin-top:8px'>To cancel or downgrade "
             "email <a href='mailto:cosmond00@gmail.com' style='color:#555'>"
