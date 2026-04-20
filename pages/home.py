@@ -317,6 +317,7 @@ if st.session_state.step in (1, 2):
             st.markdown('<div class="info-box">Upload a PDF bank statement. You can redact sensitive '
                         'information (account numbers, BSB, personal details) before the AI reads it.</div>',
                         unsafe_allow_html=True)
+            st.markdown("<div style='padding-top:8px'></div>", unsafe_allow_html=True)
             uploaded = st.file_uploader("Upload PDF", type=["pdf"], label_visibility="visible")
             if uploaded:
                 b = uploaded.read()
