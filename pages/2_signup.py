@@ -2,7 +2,7 @@ import streamlit as st
 from auth import get_supabase, is_logged_in, AUTH_CSS
 import re
 
-st.set_page_config(page_title="Sign Up — Clara", page_icon="💳", layout="centered")
+st.set_page_config(page_title="Sign Up — Clara", page_icon="💳", layout="centered", initial_sidebar_state="collapsed")
 st.markdown(AUTH_CSS, unsafe_allow_html=True)
 st.markdown("""
 <style>
@@ -28,7 +28,7 @@ st.markdown("""<div style="text-align:center;padding:48px 0 24px">
     Create your account
   </div>
   <div style="font-size:.85rem;color:#666">
-    Start categorizing your expenses for free
+    Start your free beta access today
   </div>
 </div>""", unsafe_allow_html=True)
 
