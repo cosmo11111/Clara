@@ -1,6 +1,6 @@
 import streamlit as st
 from auth import require_auth, get_user, clear_session, get_supabase, AUTH_CSS
-from db import (get_profile, TIER_LABELS, load_categories, save_category,
+from db import (get_profile, TIER_LABELS, load_categories, save_category, auto_assign_color,
                 delete_category, load_vendor_rules, save_vendor_rule,
                 delete_vendor_rule, DEFAULT_CATEGORY_COLORS)
 
@@ -105,8 +105,7 @@ st.html("""
 # ── Header ─────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style="padding:4px 0 8px">
-  <span style="font-family:'DM Sans',sans-serif;font-size:1.2rem;font-weight:700;
-               font-family:'DM Serif Display',serif;font-style:italic;font-size:2.8rem;color:#F5B731;letter-spacing:-.01em">Clara</span>
+  <span style="font-family:'DM Serif Display',serif;font-style:italic;font-size:2.8rem;color:#F5B731;letter-spacing:-.01em">Clara</span>
 </div>
 """, unsafe_allow_html=True)
 st.markdown("## Settings")
@@ -265,21 +264,23 @@ with col2:
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
+    st.markdown(
+        "<p style='font-size:.75rem;color:#444;margin:4px 0 8px'>"
+        "Colours are assigned automatically from the Clara palette.</p>",
+        unsafe_allow_html=True
+    )
+
     # Add new category
     with st.expander("＋ Add new category"):
-        nc1, nc2, nc3 = st.columns([3, 1, 1])
+        nc1, nc2 = st.columns([4, 1])
         with nc1:
             new_cat_name = st.text_input("Name", placeholder="e.g. Pet Care",
                                           key="settings_cat_name",
                                           label_visibility="collapsed")
         with nc2:
-            new_cat_color = st.color_picker("Colour", value="#a78bfa",
-                                             key="settings_cat_color",
-                                             label_visibility="collapsed")
-        with nc3:
             if st.button("Save", key="settings_cat_save", use_container_width=True):
                 if new_cat_name.strip():
-                    ok, err = save_category(uid, new_cat_name.strip(), new_cat_color)
+                    ok, err = save_category(uid, new_cat_name.strip())
                     if ok:
                         st.toast(f"'{new_cat_name}' saved")
                         load_categories.clear()
