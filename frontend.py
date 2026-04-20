@@ -4,7 +4,7 @@ frontend.py — Clara router.
 import streamlit as st
 from auth import is_logged_in
 
-st.set_page_config(page_title="Clara", page_icon="💳", layout="wide")
+st.set_page_config(page_title="Clara", page_icon="💳", layout="wide", initial_sidebar_state="expanded")
 
 # ── Define pages ───────────────────────────────────────────────────────────────
 login_page   = st.Page("pages/login.py",   title="Log in",         url_path="login")
