@@ -4,7 +4,6 @@ from auth import require_auth, get_user, clear_session, get_supabase
 from db import (load_reports, load_report_items, delete_report,
                 DEFAULT_CATEGORY_COLORS, get_profile, TIER_LABELS)
 
-st.set_page_config(page_title="Saved Reports — Clara", page_icon="💳", layout="wide")
 
 st.markdown("""
 <style>
@@ -40,7 +39,6 @@ div[data-testid="stExpander"] > div:last-child {
 </style>
 """, unsafe_allow_html=True)
 
-require_auth()
 
 user  = get_user()
 uid   = user.id if hasattr(user,"id") else user.get("id") if user else None
@@ -49,7 +47,7 @@ email = user.email if hasattr(user,"email") else user.get("email","") if user el
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     if st.button("⌂ Home", use_container_width=True):
-        st.switch_page("frontend.py")
+        st.switch_page(st.session_state["_page_home"])
     st.markdown("<div style='padding-top:1rem'>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -80,18 +78,18 @@ with st.sidebar.container(key="sidebar_bottom"):
     """, unsafe_allow_html=True)
     if tier == "free_trial":
         if st.button("⚡ Upgrade plan", use_container_width=True, type="primary"):
-            st.switch_page("pages/5_pricing.py")
+            st.switch_page(st.session_state["_page_pricing"])
     elif tier == "starter":
         if st.button("⚡ Upgrade to Unlimited", use_container_width=True, type="primary"):
-            st.switch_page("pages/5_pricing.py")
+            st.switch_page(st.session_state["_page_pricing"])
     else:
         if st.button("⚡ Manage plan", use_container_width=True, type="primary"):
-            st.switch_page("pages/5_pricing.py")
+            st.switch_page(st.session_state["_page_pricing"])
     if st.button("Sign out", use_container_width=True):
         try: get_supabase().auth.sign_out()
         except: pass
         clear_session()
-        st.switch_page("pages/1_login.py")
+        st.switch_page(st.session_state["_page_login"])
 
 st.html("""
 <style>
@@ -146,7 +144,7 @@ if st.session_state.get("_view_report_id"):
         st.session_state.tx_rows_source     = None
         st.session_state.redacted_pdf_bytes = None
         st.session_state._is_demo           = False
-        st.switch_page("frontend.py")
+        st.switch_page(st.session_state["_page_home"])
 
 reports = load_reports(uid)
 CATEGORY_COLORS = DEFAULT_CATEGORY_COLORS
@@ -169,20 +167,23 @@ if is_paid and reports:
         )
 
 # ── Header ─────────────────────────────────────────────────────────────────────
-st.markdown("""
-<div style="padding:4px 0 8px">
-  <span style="font-family:'DM Serif Display',serif;font-style:italic;font-size:2.8rem;color:#F5B731;letter-spacing:-.01em">Clara</span>
-</div>
-""", unsafe_allow_html=True)
-
-c1, c2 = st.columns([4, 1])
-with c1:
-    st.markdown("## Saved Reports")
+hcol1, hcol2 = st.columns([4, 1])
+with hcol1:
+    st.markdown("""
+    <div style="padding:4px 0 2px">
+      <span style="font-family:'DM Serif Display',serif;font-style:italic;font-size:2.8rem;
+                   color:#F5B731;letter-spacing:-.01em">Clara</span>
+    </div>
+    <div style="font-size:1.4rem;font-weight:500;color:#F2EEE6;margin-bottom:2px">
+      Saved Reports
+    </div>
+    """, unsafe_allow_html=True)
     if reports:
         st.caption(f"{len(reports)} report{'s' if len(reports)!=1 else ''}")
-with c2:
+with hcol2:
+    st.markdown("<div style='padding-top:1.8rem'></div>", unsafe_allow_html=True)
     if st.button("＋ New analysis", type="primary", use_container_width=True):
-        st.switch_page("frontend.py")
+        st.switch_page(st.session_state["_page_home"])
 
 if not reports:
     st.markdown("""
@@ -250,7 +251,10 @@ if month_data:
             orientation="h", yanchor="bottom", y=1.02,
             xanchor="left", x=0, font=dict(size=10),
         ),
-        xaxis=dict(gridcolor="#1c1c28", tickfont=dict(size=10), linecolor="#252535"),
+        xaxis=dict(
+            gridcolor="#1c1c28", tickfont=dict(size=10), linecolor="#252535",
+            tickformat="%b %Y",
+        ),
         yaxis=dict(
             gridcolor="#1c1c28", tickfont=dict(size=10),
             ticksuffix="%" if show_pct else "",
