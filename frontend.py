@@ -17,8 +17,7 @@ from db import (
 )
 
 # ── Page config ───────────────────────────────────────────────────────────────
-st.set_page_config(page_title="Clara", page_icon="💳", layout="wide",
-                   initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Clara", page_icon="💳", layout="wide")
 
 # ── Instant CSS — hides sidebar and nav before Python auth check runs ──────────
 st.html("""
