@@ -171,8 +171,7 @@ if is_paid and reports:
 # ── Header ─────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style="padding:4px 0 8px">
-  <span style="font-family:'DM Sans',sans-serif;font-size:1.2rem;font-weight:700;
-               font-family:'DM Serif Display',serif;font-style:italic;font-size:2.8rem;color:#F5B731;letter-spacing:-.01em">Clara</span>
+  <span style="font-family:'DM Serif Display',serif;font-style:italic;font-size:2.8rem;color:#F5B731;letter-spacing:-.01em">Clara</span>
 </div>
 """, unsafe_allow_html=True)
 
