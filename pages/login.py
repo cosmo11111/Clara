@@ -23,7 +23,7 @@ div[data-testid="stFormSubmitButton"] button:hover {
 
 # Already logged in → go straight to app
 if is_logged_in():
-    st.switch_page("pages/home.py")
+    st.switch_page(st.session_state["_page_home"])
 
 st.markdown("""
 <div style="text-align:center;padding:48px 0 24px">
@@ -64,7 +64,7 @@ with col:
                     {"email": email.strip(), "password": password}
                 )
                 set_session({"user": res.user, "access_token": res.session.access_token})
-                st.switch_page("pages/home.py")
+                st.switch_page(st.session_state["_page_home"])
             except Exception as e:
                 err = str(e)
                 if "Invalid login" in err or "invalid" in err.lower():
