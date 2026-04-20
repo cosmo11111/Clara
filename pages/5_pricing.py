@@ -19,6 +19,14 @@ section[data-testid="stSidebar"] button[kind="primary"] * { color:#0b0b12 !impor
 .stButton button[kind="primary"] { background:#F5B731 !important; color:#0b0b12 !important; border:none !important; }
 .stLinkButton a { border-radius:8px !important; font-weight:500 !important; }
 
+/* Pull buttons up tight against the card above */
+div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlockBorderWrapper"],
+div[data-testid="column"] > div > div > div[data-testid="stButton"],
+div[data-testid="column"] > div > div > div[data-testid="stLinkButton"] {
+    margin-top:-8px !important;
+}
+.pc { margin-bottom:0 !important; }
+
 .pc {
     background:#171720; border:0.5px solid #1c1c28; border-radius:14px;
     padding:1.75rem 1.5rem; height:100%;
@@ -221,6 +229,7 @@ with col1:
       <div class="pc-feat on"><span class="pc-tick">✓</span>Save report summaries</div>
       <div class="pc-feat"><span class="pc-cross">✗</span>AI insights</div>
       <div class="pc-feat"><span class="pc-cross">✗</span>Full transaction history</div>
+      <div style="height:28px"></div>
     </div>
     """, unsafe_allow_html=True)
     if is_current:
@@ -253,6 +262,9 @@ with col2:
       <div class="pc-feat on"><span class="pc-tick">✓</span>Full transaction history</div>
       <div class="pc-feat on"><span class="pc-tick">✓</span>Historical reports</div>
       <div class="pc-feat"><span class="pc-cross">✗</span>Unlimited analyses</div>
+      <div style="margin-top:10px;font-size:.75rem;color:#3a3a50;font-style:italic">
+        More features to come
+      </div>
     </div>
     """, unsafe_allow_html=True)
     if is_current:
@@ -291,6 +303,9 @@ with col3:
       <div class="pc-feat on"><span class="pc-tick">✓</span>Saving ratio metric</div>
       <div class="pc-feat on"><span class="pc-tick">✓</span>Investment projection</div>
       <div class="pc-feat on"><span class="pc-tick">✓</span>Budget targets</div>
+      <div style="margin-top:10px;font-size:.75rem;color:#3a3a50;font-style:italic">
+        More features to come
+      </div>
     </div>
     """, unsafe_allow_html=True)
     if is_current:
