@@ -10,7 +10,7 @@ import pandas as pd
 from auth import require_auth, get_user, clear_session, get_supabase
 from db import (
     can_analyse, increment_usage, get_profile, TIER_LABELS, TIER_LIMITS,
-    load_categories, save_category, delete_category,
+    load_categories, save_category, delete_category, auto_assign_color,
     load_vendor_rules, apply_vendor_rules, save_vendor_rule, delete_vendor_rule,
     save_report, load_reports, load_report_items, delete_report, check_duplicate_report,
     DEFAULT_CATEGORY_COLORS,
@@ -1340,24 +1340,22 @@ Top vendors: {_top_v}"""
         if new_cats_needed:
             st.markdown('<div class="info-box blue">You selected <b>＋ Add new category…</b> — '
                         'enter the name and colour below, then save.</div>', unsafe_allow_html=True)
-            nc1, nc2, nc3 = st.columns([3, 2, 1])
+            nc1, nc2 = st.columns([4, 1])
             with nc1:
-                inline_cat_name  = st.text_input("New category name",
-                                                  placeholder="e.g. Pet Care",
-                                                  key="inline_cat_name")
+                inline_cat_name = st.text_input("New category name",
+                                                 placeholder="e.g. Pet Care",
+                                                 key="inline_cat_name")
             with nc2:
-                inline_cat_color = st.color_picker("Colour", value="#a78bfa",
-                                                    key="inline_cat_color")
-            with nc3:
                 st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
-                if st.button("Save category", type="primary", use_container_width=True):
+                if st.button("Save", type="primary", use_container_width=True,
+                             key="save_inline_cat"):
                     name = inline_cat_name.strip()
                     if not name:
                         st.warning("Enter a category name.")
                     elif not uid:
                         st.warning("Sign in to save categories.")
                     else:
-                        ok, err = save_category(uid, name, inline_cat_color)
+                        ok, err = save_category(uid, name)
                         if ok:
                             for i in new_cats_needed:
                                 rows[i]["category"] = name
