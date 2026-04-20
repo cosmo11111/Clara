@@ -7,13 +7,13 @@ from auth import is_logged_in
 st.set_page_config(page_title="Clara", page_icon="💳", layout="wide", initial_sidebar_state="expanded")
 
 # ── Define pages ───────────────────────────────────────────────────────────────
-login_page   = st.Page("pages/login.py",   title="Log in",         url_path="login")
-signup_page  = st.Page("pages/signup.py",  title="Sign up",        url_path="signup")
-reset_page   = st.Page("pages/reset.py",   title="Reset password", url_path="reset")
-home_page    = st.Page("pages/home.py",    title="Home",           url_path="home", default=True)
-reports_page = st.Page("pages/reports.py", title="Saved Reports",  url_path="reports")
-pricing_page = st.Page("pages/pricing.py", title="Pricing",        url_path="pricing")
-settings_page= st.Page("pages/settings.py",title="Settings",       url_path="settings")
+login_page    = st.Page("pages/login.py",    title="Log in",         url_path="login",    default=True)
+signup_page   = st.Page("pages/signup.py",   title="Sign up",        url_path="signup")
+reset_page    = st.Page("pages/reset.py",    title="Reset password", url_path="reset")
+home_page     = st.Page("pages/home.py",     title="Home",           url_path="home",     default=True)
+reports_page  = st.Page("pages/reports.py",  title="Saved Reports",  url_path="reports")
+pricing_page  = st.Page("pages/pricing.py",  title="Pricing",        url_path="pricing")
+settings_page = st.Page("pages/settings.py", title="Settings",       url_path="settings")
 
 # ── Store page objects in session state so any page can switch to them ─────────
 st.session_state["_page_login"]    = login_page
