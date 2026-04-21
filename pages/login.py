@@ -1,7 +1,6 @@
 import streamlit as st
 from auth import get_supabase, set_session, is_logged_in, AUTH_CSS
 
-st.set_page_config(page_title="Login — Clara", page_icon="💳", layout="centered", initial_sidebar_state="collapsed")
 st.markdown(AUTH_CSS, unsafe_allow_html=True)
 st.markdown("""
 <style>
@@ -23,7 +22,7 @@ div[data-testid="stFormSubmitButton"] button:hover {
 
 # Already logged in → go straight to app
 if is_logged_in():
-    st.switch_page(st.session_state["_page_home"])
+    st.switch_page(st.session_state.get("_page_home", "pages/home.py"))
 
 st.markdown("""
 <div style="text-align:center;padding:48px 0 24px">
@@ -64,7 +63,7 @@ with col:
                     {"email": email.strip(), "password": password}
                 )
                 set_session({"user": res.user, "access_token": res.session.access_token})
-                st.switch_page(st.session_state["_page_home"])
+                st.switch_page(st.session_state.get("_page_home", "pages/home.py"))
             except Exception as e:
                 err = str(e)
                 if "Invalid login" in err or "invalid" in err.lower():
@@ -83,10 +82,10 @@ with col:
     col_r, col_s = st.columns(2)
     with col_r:
         if st.button("Forgot password?", use_container_width=True):
-            st.switch_page(st.session_state["_page_reset"])
+            st.switch_page(st.session_state.get("_page_reset", "pages/reset.py"))
     with col_s:
         if st.button("Sign up free →", use_container_width=True, type="primary"):
-            st.switch_page(st.session_state["_page_signup"])
+            st.switch_page(st.session_state.get("_page_signup", "pages/signup.py"))
     st.markdown(
         '<div class="auth-link" style="margin-top:16px;font-size:.75rem;color:#444">'
         '<a href="https://drive.google.com/file/d/1Yl0ed8IiMzYalV2rcXUsLtBymnvvjyZ5/view?usp=sharing" target="_blank" style="color:#555">📄 Privacy Policy</a>'
