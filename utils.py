@@ -145,7 +145,7 @@ def categorize_with_gemini(text: str, all_categories: dict,
     """Send bank statement text to Gemini and return categorised transactions."""
     from db import apply_vendor_rules
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.5-flash-lite-preview-09-2025")
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
     cat_list = ", ".join(all_categories.keys())
     prompt = f"""Extract ALL transactions from this bank statement text.
 Return ONLY a JSON array. Each object must have exactly these keys:
