@@ -145,7 +145,7 @@ def categorize_with_gemini(text: str, all_categories: dict,
     """Send bank statement text to Gemini and return categorised transactions."""
     from db import apply_vendor_rules
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-3.1-flash-lite-preview")
+    model = genai.GenerativeModel("gemini-2.5-flash-lite-preview-09-2025")
     cat_list = ", ".join(all_categories.keys())
     prompt = f"""Extract ALL transactions from this bank statement text.
 Return ONLY a JSON array. Each object must have exactly these keys:
@@ -187,7 +187,7 @@ def generate_insight(total_spend: float, total_income: float,
                      top_vendors: list) -> str | None:
     """Generate a one-paragraph AI spending insight via Gemini."""
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-3.1-flash-lite-preview")
+    model = genai.GenerativeModel("gemini-3-flash-preview")
     prompt = f"""You are a personal finance assistant. Given this spending summary,
 provide 1-2 sentences of genuinely useful insight. Focus on something specific and
 interesting — a pattern, a standout category, a vendor worth noticing, or a
