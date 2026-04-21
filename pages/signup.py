@@ -16,7 +16,10 @@ div[data-testid="stFormSubmitButton"] button {
 </style>""", unsafe_allow_html=True)
 
 if is_logged_in():
-    st.switch_page(st.session_state["_page_home"])
+    if "_page_home" in st.session_state:
+        st.switch_page(st.session_state.get("_page_home", "pages/home.py"))
+    else:
+        st.rerun() if "_page_home" in st.session_state else st.rerun()
 
 st.markdown("""<div style="text-align:center;padding:48px 0 24px">
   <div style="font-family:'DM Serif Display',serif;font-style:italic;font-size:3rem;
@@ -70,7 +73,7 @@ with col:
                 if res.user and res.session:
                     # Email confirmation is off — session is returned immediately
                     set_session({"user": res.user, "access_token": res.session.access_token})
-                    st.switch_page(st.session_state["_page_home"])
+                    st.switch_page(st.session_state.get("_page_home", "pages/home.py")) if "_page_home" in st.session_state else st.rerun()
                 elif res.user:
                     # User created but no session yet — ask them to sign in
                     msg_placeholder.markdown(
@@ -108,7 +111,7 @@ with col:
 
     st.markdown('<hr class="auth-divider">', unsafe_allow_html=True)
     if st.button("Already have an account? Sign in", use_container_width=True):
-        st.switch_page(st.session_state["_page_login"])
+        st.switch_page(st.session_state.get("_page_login", "pages/login.py")) if "_page_login" in st.session_state else st.rerun()
     st.markdown(
         '<div class="auth-link" style="margin-top:12px;font-size:.75rem;color:#444">'
         'By signing up you agree to our '
